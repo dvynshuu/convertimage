@@ -65,10 +65,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/icon.jpg', sizes: '512x512', type: 'image/jpeg' },
       { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    shortcut: '/icon.jpg',
+    shortcut: '/favicon.ico',
     apple: '/apple-touch-icon.png',
   },
   manifest: '/manifest.webmanifest',
