@@ -64,7 +64,11 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/icon.jpg', sizes: '512x512', type: 'image/jpeg' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    shortcut: '/icon.jpg',
     apple: '/apple-touch-icon.png',
   },
   manifest: '/manifest.webmanifest',
@@ -93,7 +97,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} suppressHydrationWarning />
       </head>
       <body>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>

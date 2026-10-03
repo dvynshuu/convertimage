@@ -5,6 +5,7 @@ import type { UseBatchConverterReturn } from '@/hooks/useBatchConverter';
 import { formatFileSize } from '@/lib/formats';
 import { FormatSelector } from './FormatSelector';
 import { QualitySlider } from './QualitySlider';
+import { ResizeControls } from './ResizeControls';
 import { ExifToggle } from './ExifToggle';
 import styles from './BatchQueue.module.css';
 
@@ -27,6 +28,10 @@ export function BatchQueue({
     quality,
     preserveExif,
     stripGps,
+    resizePreset,
+    customWidth,
+    customHeight,
+    maintainAspectRatio,
     isConverting,
     isZipGenerating,
     zipProgress,
@@ -35,12 +40,19 @@ export function BatchQueue({
     processingCount,
     pendingCount,
     totalOriginalSize,
-    totalOutputSize,
-    totalSavingsPercent,
+    completedOriginalSize,
+    completedOutputSize,
+    savingsPercentage,
+    isSmaller,
+    isIdentical,
     setOutputFormat,
     setQuality,
     setPreserveExif,
     setStripGps,
+    setResizePreset,
+    setCustomWidth,
+    setCustomHeight,
+    setMaintainAspectRatio,
     convertAll,
     cancelAll,
     clearAll,
@@ -66,10 +78,18 @@ export function BatchQueue({
               <>
                 {successCount} of {totalCount} completed
                 {processingCount > 0 ? ` · ${processingCount} converting` : ''} ·{' '}
-                {formatFileSize(totalOriginalSize)} &rarr; {formatFileSize(totalOutputSize)}
-                <span className={styles.savingsBadge}>
-                  (-{totalSavingsPercent}% saved)
-                </span>
+                {formatFileSize(completedOriginalSize)} &rarr; {formatFileSize(completedOutputSize)}
+                {isIdentical ? (
+                  <span className={styles.savingsBadge}> (size unchanged)</span>
+                ) : isSmaller ? (
+                  <span className={styles.savingsBadge}>
+                    (-{savingsPercentage}% saved)
+                  </span>
+                ) : (
+                  <span className={styles.savingsBadgeWarning}>
+                    (+{savingsPercentage}% larger)
+                  </span>
+                )}
               </>
             ) : (
               `${pendingCount} ready to convert · Total: ${formatFileSize(totalOriginalSize)}`
@@ -161,6 +181,19 @@ export function BatchQueue({
               onChange={setQuality}
             />
 
+            <ResizeControls
+              originalWidth={null}
+              originalHeight={null}
+              width={customWidth}
+              height={customHeight}
+              preset={resizePreset}
+              maintainAspectRatio={maintainAspectRatio}
+              onPresetChange={setResizePreset}
+              onWidthChange={setCustomWidth}
+              onHeightChange={setCustomHeight}
+              onAspectRatioChange={setMaintainAspectRatio}
+            />
+
             <ExifToggle
               preserveExif={preserveExif}
               stripGps={stripGps}
@@ -243,8 +276,14 @@ export function BatchQueue({
               )}
 
               {item.status === 'error' && (
-                <span className={styles.statusError} title={item.error?.userMessage}>
-                  Failed
+                <span className={styles.statusError} title={item.error?.userMessage || 'Conversion failed'}>
+                  {item.error?.userMessage ? item.error.userMessage : 'Failed'}
+                </span>
+              )}
+
+              {item.status === 'cancelled' && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Cancelled
                 </span>
               )}
 

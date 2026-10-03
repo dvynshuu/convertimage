@@ -1,39 +1,83 @@
-import type { InputFormat, ValidationResult, ConversionError } from './types';
-import { MIME_FORMAT_MAP } from './types';
+import type {
+  InputFormat,
+  OutputFormat,
+  ValidationResult,
+  ResizePreset,
+} from './types';
+import { MIME_FORMAT_MAP, FORMAT_EXTENSIONS } from './types';
 import { IMAGE_LIMITS, ACCEPTED_EXTENSIONS } from './constants';
+import { createConversionError } from './errors';
 
 /**
  * Detect format from magic bytes (file header).
- * More reliable than MIME type or extension alone.
+ * Inspects signatures and ISO BMFF container brands.
  */
 export function detectFormatFromBytes(buffer: ArrayBuffer): InputFormat | null {
-  const view = new Uint8Array(buffer.slice(0, 12));
+  if (!buffer || buffer.byteLength < 4) return null;
+  const view = new Uint8Array(buffer.slice(0, Math.min(64, buffer.byteLength)));
 
   // JPEG: FF D8 FF
-  if (view[0] === 0xFF && view[1] === 0xD8 && view[2] === 0xFF) {
+  if (view[0] === 0xff && view[1] === 0xd8 && view[2] === 0xff) {
     return 'jpg';
   }
 
-  // PNG: 89 50 4E 47
-  if (view[0] === 0x89 && view[1] === 0x50 && view[2] === 0x4E && view[3] === 0x47) {
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    view.length >= 8 &&
+    view[0] === 0x89 &&
+    view[1] === 0x50 &&
+    view[2] === 0x4e &&
+    view[3] === 0x47 &&
+    view[4] === 0x0d &&
+    view[5] === 0x0a &&
+    view[6] === 0x1a &&
+    view[7] === 0x0a
+  ) {
     return 'png';
   }
 
   // WebP: RIFF....WEBP
-  if (view[0] === 0x52 && view[1] === 0x49 && view[2] === 0x46 && view[3] === 0x46 &&
-      view[8] === 0x57 && view[9] === 0x45 && view[10] === 0x42 && view[11] === 0x50) {
+  if (
+    view.length >= 12 &&
+    view[0] === 0x52 &&
+    view[1] === 0x49 &&
+    view[2] === 0x46 &&
+    view[3] === 0x46 &&
+    view[8] === 0x57 &&
+    view[9] === 0x45 &&
+    view[10] === 0x42 &&
+    view[11] === 0x50
+  ) {
     return 'webp';
   }
 
-  // HEIC/HEIF/AVIF — all use ISO BMFF container with ftyp box
-  // ftyp at bytes 4-7
-  if (view[4] === 0x66 && view[5] === 0x74 && view[6] === 0x79 && view[7] === 0x70) {
-    // Read the brand (bytes 8-11)
-    const brand = String.fromCharCode(view[8], view[9], view[10], view[11]);
+  // HEIC/HEIF/AVIF — ISO Base Media File Format (ISOBMFF) container with 'ftyp' box
+  if (
+    view.length >= 12 &&
+    view[4] === 0x66 &&
+    view[5] === 0x74 &&
+    view[6] === 0x79 &&
+    view[7] === 0x70
+  ) {
+    // Major brand (bytes 8-11)
+    const majorBrand = String.fromCharCode(view[8], view[9], view[10], view[11]).toLowerCase();
 
-    if (brand === 'avif' || brand === 'avis') return 'avif';
-    if (brand === 'heic' || brand === 'heix' || brand === 'heim' || brand === 'heis') return 'heic';
-    if (brand === 'heif' || brand === 'hevx' || brand === 'mif1') return 'heif';
+    if (majorBrand === 'avif' || majorBrand === 'avis') return 'avif';
+    if (majorBrand === 'heic' || majorBrand === 'heix' || majorBrand === 'heim' || majorBrand === 'heis') return 'heic';
+    if (majorBrand === 'heif' || majorBrand === 'hevx' || majorBrand === 'mif1' || majorBrand === 'msf1') return 'heif';
+
+    // Scan compatible brands list (bytes 16 onwards in 4-byte strides)
+    for (let offset = 16; offset + 4 <= view.length; offset += 4) {
+      const compatBrand = String.fromCharCode(
+        view[offset],
+        view[offset + 1],
+        view[offset + 2],
+        view[offset + 3],
+      ).toLowerCase();
+      if (compatBrand === 'avif' || compatBrand === 'avis') return 'avif';
+      if (compatBrand === 'heic' || compatBrand === 'heix' || compatBrand === 'heim' || compatBrand === 'heis') return 'heic';
+      if (compatBrand === 'heif' || compatBrand === 'hevx' || compatBrand === 'mif1' || compatBrand === 'msf1') return 'heif';
+    }
   }
 
   return null;
@@ -43,7 +87,10 @@ export function detectFormatFromBytes(buffer: ArrayBuffer): InputFormat | null {
  * Detect format from file extension.
  */
 export function detectFormatFromExtension(filename: string): InputFormat | null {
-  const ext = filename.toLowerCase().split('.').pop();
+  if (!filename) return null;
+  const parts = filename.toLowerCase().split('.');
+  if (parts.length < 2) return null;
+  const ext = parts.pop();
   if (!ext) return null;
 
   const formatMap: Record<string, InputFormat> = {
@@ -63,21 +110,31 @@ export function detectFormatFromExtension(filename: string): InputFormat | null 
  * Detect format from MIME type.
  */
 export function detectFormatFromMime(mimeType: string): InputFormat | null {
-  return MIME_FORMAT_MAP[mimeType] ?? null;
+  if (!mimeType) return null;
+  const cleanMime = mimeType.toLowerCase().split(';')[0].trim();
+  return MIME_FORMAT_MAP[cleanMime] ?? null;
 }
 
 /**
- * Best-effort format detection combining multiple signals.
+ * Robust format detection combining magic bytes, MIME, and extension.
+ * Returns null if format cannot be verified — NEVER defaults unknown to jpg.
  */
 export async function detectFormat(file: File): Promise<InputFormat | null> {
   // 1. Try magic bytes (most reliable)
-  const headerBuffer = await file.slice(0, 12).arrayBuffer();
-  const fromBytes = detectFormatFromBytes(headerBuffer);
-  if (fromBytes) return fromBytes;
+  try {
+    const slice = file.slice(0, 64);
+    const headerBuffer = await slice.arrayBuffer();
+    const fromBytes = detectFormatFromBytes(headerBuffer);
+    if (fromBytes) return fromBytes;
+  } catch {
+    // continue to fallbacks if reading slice failed
+  }
 
   // 2. Try MIME type
-  const fromMime = detectFormatFromMime(file.type);
-  if (fromMime) return fromMime;
+  if (file.type) {
+    const fromMime = detectFormatFromMime(file.type);
+    if (fromMime) return fromMime;
+  }
 
   // 3. Fallback to extension
   return detectFormatFromExtension(file.name);
@@ -87,20 +144,22 @@ export async function detectFormat(file: File): Promise<InputFormat | null> {
  * Check whether a file extension is in our accepted list.
  */
 export function hasAcceptedExtension(filename: string): boolean {
+  if (!filename) return false;
   const ext = '.' + filename.toLowerCase().split('.').pop();
   return ACCEPTED_EXTENSIONS.includes(ext as typeof ACCEPTED_EXTENSIONS[number]);
 }
 
 /**
- * Validate a file before processing.
+ * Single source of truth for file validation.
+ * Enforces file sanity, size, format, dimension, and pixel limits consistently.
  */
 export async function validateFile(file: File): Promise<ValidationResult> {
-  // Check file size
-  if (file.size > IMAGE_LIMITS.maxFileSizeBytes) {
+  // 1. Basic file sanity
+  if (!file) {
     return {
       valid: false,
-      fileSize: file.size,
-      error: createValidationError('file_too_large'),
+      fileSize: 0,
+      error: createConversionError('INVALID_FILE'),
     };
   }
 
@@ -108,22 +167,33 @@ export async function validateFile(file: File): Promise<ValidationResult> {
     return {
       valid: false,
       fileSize: 0,
-      error: createValidationError('corrupted_file'),
+      error: createConversionError('INVALID_FILE', {
+        message: 'Selected file is empty (0 bytes).',
+        userMessage: 'The selected file is empty or unreadable.',
+      }),
     };
   }
 
-  // Detect format
+  // 2. Size check
+  if (file.size > IMAGE_LIMITS.maxFileSizeBytes) {
+    return {
+      valid: false,
+      fileSize: file.size,
+      error: createConversionError('FILE_TOO_LARGE'),
+    };
+  }
+
+  // 3. Format detection
   const format = await detectFormat(file);
   if (!format) {
     return {
       valid: false,
       fileSize: file.size,
-      error: createValidationError('unsupported_format'),
+      error: createConversionError('UNSUPPORTED_FORMAT'),
     };
   }
 
-  // For HEIC/HEIF, we can't easily get dimensions without decoding.
-  // We'll validate dimensions after decoding.
+  // 4. For HEIC/HEIF, dimension inspection is deferred until specialized decode
   if (format === 'heic' || format === 'heif') {
     return {
       valid: true,
@@ -132,112 +202,158 @@ export async function validateFile(file: File): Promise<ValidationResult> {
     };
   }
 
-  // For standard web formats, try to decode and check dimensions
-  try {
-    const bitmap = await createImageBitmap(file);
-    const width = bitmap.width;
-    const height = bitmap.height;
-    bitmap.close();
+  // 5. Dimension & pixel safety check using browser decoder
+  if (typeof createImageBitmap !== 'undefined') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const width = bitmap.width;
+      const height = bitmap.height;
+      bitmap.close();
 
-    if (width * height > IMAGE_LIMITS.maxPixels) {
+      if (width * height > IMAGE_LIMITS.maxPixels) {
+        return {
+          valid: false,
+          format,
+          width,
+          height,
+          fileSize: file.size,
+          error: createConversionError('IMAGE_TOO_LARGE', {
+            message: `Pixel count (${width}x${height} = ${width * height}) exceeds limit of ${IMAGE_LIMITS.maxPixels}.`,
+          }),
+        };
+      }
+
+      if (width > IMAGE_LIMITS.maxDimension || height > IMAGE_LIMITS.maxDimension) {
+        return {
+          valid: false,
+          format,
+          width,
+          height,
+          fileSize: file.size,
+          error: createConversionError('IMAGE_TOO_LARGE', {
+            message: `Dimension exceeds single-side limit of ${IMAGE_LIMITS.maxDimension}px.`,
+          }),
+        };
+      }
+
       return {
-        valid: false,
+        valid: true,
         format,
         width,
         height,
         fileSize: file.size,
-        error: createValidationError('dimensions_too_large'),
       };
-    }
-
-    if (width > IMAGE_LIMITS.maxDimension || height > IMAGE_LIMITS.maxDimension) {
+    } catch {
       return {
         valid: false,
         format,
-        width,
-        height,
         fileSize: file.size,
-        error: createValidationError('dimensions_too_large'),
+        error: createConversionError('DECODE_FAILED', {
+          message: 'Browser failed to decode image bitmap.',
+        }),
       };
     }
-
-    return {
-      valid: true,
-      format,
-      width,
-      height,
-      fileSize: file.size,
-    };
-  } catch {
-    return {
-      valid: false,
-      format,
-      fileSize: file.size,
-      error: createValidationError('corrupted_file'),
-    };
   }
+
+  return {
+    valid: true,
+    format,
+    fileSize: file.size,
+  };
 }
 
 /**
- * Generate a clean output filename.
+ * Shared resize calculation engine.
+ * Supports presets (25%, 50%, 75%), explicit dimensions, aspect ratio locking,
+ * and guards against zero, negative, NaN, or absurd values.
+ */
+export function calculateResizeDimensions(
+  originalWidth: number,
+  originalHeight: number,
+  options: {
+    width?: number;
+    height?: number;
+    preset?: ResizePreset;
+    maintainAspectRatio?: boolean;
+  },
+): { width: number; height: number } {
+  const origW = Math.max(1, Math.round(originalWidth || 1));
+  const origH = Math.max(1, Math.round(originalHeight || 1));
+
+  // Preset percentage scaling
+  if (options.preset && options.preset !== 'original' && options.preset !== 'custom') {
+    const scale = Number(options.preset) / 100;
+    if (!isNaN(scale) && scale > 0) {
+      return {
+        width: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, Math.round(origW * scale))),
+        height: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, Math.round(origH * scale))),
+      };
+    }
+  }
+
+  // No custom width or height requested -> original dimensions
+  if (!options.width && !options.height) {
+    return { width: origW, height: origH };
+  }
+
+  const aspectRatio = origW / origH;
+  const maintainAspect = options.maintainAspectRatio !== false;
+
+  let targetW = options.width ? Math.round(options.width) : undefined;
+  let targetH = options.height ? Math.round(options.height) : undefined;
+
+  if (targetW !== undefined && (isNaN(targetW) || targetW <= 0)) targetW = undefined;
+  if (targetH !== undefined && (isNaN(targetH) || targetH <= 0)) targetH = undefined;
+
+  if (maintainAspect) {
+    if (targetW && !targetH) {
+      return {
+        width: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, targetW)),
+        height: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, Math.round(targetW / aspectRatio))),
+      };
+    }
+    if (targetH && !targetW) {
+      return {
+        width: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, Math.round(targetH * aspectRatio))),
+        height: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, targetH)),
+      };
+    }
+    if (targetW && targetH) {
+      // Fit within bounding box
+      const scaleW = targetW / origW;
+      const scaleH = targetH / origH;
+      const scale = Math.min(scaleW, scaleH);
+      return {
+        width: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, Math.round(origW * scale))),
+        height: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, Math.round(origH * scale))),
+      };
+    }
+  }
+
+  return {
+    width: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, targetW ?? origW)),
+    height: Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, targetH ?? origH)),
+  };
+}
+
+/**
+ * Generate a clean, sanitized output filename.
  */
 export function generateOutputFilename(
   originalName: string,
-  outputFormat: string,
+  outputFormat: OutputFormat | string,
   width?: number,
   height?: number,
 ): string {
   const baseName = originalName.replace(/\.[^.]+$/, '');
   const sanitized = baseName.replace(/[^a-zA-Z0-9_\-. ]/g, '').trim() || 'image';
+  const ext = outputFormat === 'jpg' ? '.jpg' : FORMAT_EXTENSIONS[outputFormat as OutputFormat] || `.${outputFormat}`;
 
   if (width && height) {
-    return `${sanitized}-${width}x${height}.${outputFormat === 'jpg' ? 'jpg' : outputFormat}`;
+    return `${sanitized}-${width}x${height}${ext}`;
   }
 
-  return `${sanitized}.${outputFormat === 'jpg' ? 'jpg' : outputFormat}`;
-}
-
-/**
- * Create standardized validation errors.
- */
-function createValidationError(type: ConversionError['type']): ConversionError {
-  switch (type) {
-    case 'file_too_large':
-      return {
-        type: 'file_too_large',
-        message: 'File exceeds maximum size limit',
-        userMessage: 'This image is too large to process safely in your browser.',
-        recoveryAction: `Please choose an image under ${IMAGE_LIMITS.maxFileSizeMB} MB.`,
-      };
-    case 'corrupted_file':
-      return {
-        type: 'corrupted_file',
-        message: 'File is corrupted or empty',
-        userMessage: 'This file appears to be corrupted or damaged.',
-        recoveryAction: 'Try another file.',
-      };
-    case 'unsupported_format':
-      return {
-        type: 'unsupported_format',
-        message: 'File format not supported',
-        userMessage: 'This file format is not supported.',
-        recoveryAction: 'Try JPG, PNG, WebP, AVIF, or HEIC.',
-      };
-    case 'dimensions_too_large':
-      return {
-        type: 'dimensions_too_large',
-        message: 'Image dimensions exceed safe limit',
-        userMessage: "This image's dimensions exceed the safe processing limit.",
-        recoveryAction: 'Try a smaller image.',
-      };
-    default:
-      return {
-        type: 'unknown',
-        message: 'Unknown validation error',
-        userMessage: "We couldn't process this file.",
-        recoveryAction: 'Try another file.',
-      };
-  }
+  return `${sanitized}${ext}`;
 }
 
 /**
@@ -254,14 +370,28 @@ export function formatFileSize(bytes: number): string {
 
 /**
  * Calculate size savings percentage.
+ * Correctly distinguishes reductions from expansions without hiding negative change.
  */
-export function calculateSavings(originalSize: number, outputSize: number): {
+export function calculateSavings(
+  originalSize: number,
+  outputSize: number,
+): {
   percentage: number;
   isSmaller: boolean;
+  isIdentical: boolean;
+  differenceBytes: number;
 } {
-  const percentage = Math.abs(((originalSize - outputSize) / originalSize) * 100);
+  if (originalSize <= 0) {
+    return { percentage: 0, isSmaller: false, isIdentical: true, differenceBytes: 0 };
+  }
+
+  const diff = originalSize - outputSize;
+  const percentage = Math.round(Math.abs((diff / originalSize) * 100));
+
   return {
-    percentage: Math.round(percentage),
+    percentage,
     isSmaller: outputSize < originalSize,
+    isIdentical: outputSize === originalSize,
+    differenceBytes: Math.abs(diff),
   };
 }

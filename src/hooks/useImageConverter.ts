@@ -5,15 +5,17 @@ import type {
   ConversionState,
   ConversionOptions,
   ConversionResult,
-  ConversionError,
   InputFormat,
   OutputFormat,
   ValidationResult,
 } from '@/lib/types';
 import { validateFile, detectFormat } from '@/lib/formats';
-import { convertImage, cleanupResult, checkAvifSupport } from '@/lib/conversion/engine';
-import { applyExifPolicy } from '@/lib/conversion/exif';
+import { checkAvifSupport } from '@/lib/conversion/engine';
+import { executeConversionJob } from '@/lib/conversion/pipeline';
+import { globalWorkerPool } from '@/lib/conversion/workerPool';
 import { DEFAULT_QUALITY } from '@/lib/constants';
+import { createConversionError, isConversionError } from '@/lib/errors';
+import { createTrackedUrl, revokeTrackedUrl } from '@/lib/objectUrls';
 
 export interface UseImageConverterReturn {
   /** Current state of the conversion pipeline */
@@ -61,7 +63,7 @@ export interface UseImageConverterReturn {
 
   /* ─── Actions ─── */
 
-  /** Handle file selection */
+  /** Handle file selection with race condition protection */
   selectFile: (file: File) => Promise<void>;
 
   /** Set the output format */
@@ -108,24 +110,44 @@ export function useImageConverter(
   const [originalHeight, setOriginalHeight] = useState<number | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const currentJobIdRef = useRef<string | null>(null);
   const previousResultRef = useRef<ConversionResult | null>(null);
+  const selectionGenerationRef = useRef(0);
 
-  // Check AVIF support on mount
+  // Check AVIF capability at runtime
   useEffect(() => {
     checkAvifSupport().then(setAvifSupported);
   }, []);
 
   const cleanup = useCallback(() => {
-    if (previousResultRef.current) {
-      cleanupResult(previousResultRef.current);
+    if (previousResultRef.current?.objectUrl) {
+      revokeTrackedUrl(previousResultRef.current.objectUrl);
       previousResultRef.current = null;
     }
     if (originalPreviewUrl) {
-      URL.revokeObjectURL(originalPreviewUrl);
+      revokeTrackedUrl(originalPreviewUrl);
+      setOriginalPreviewUrl(null);
     }
   }, [originalPreviewUrl]);
 
+  // Clean up object URLs on component unmount
+  useEffect(() => {
+    return () => {
+      if (currentJobIdRef.current) {
+        globalWorkerPool.cancel(currentJobIdRef.current);
+      }
+      if (previousResultRef.current?.objectUrl) {
+        revokeTrackedUrl(previousResultRef.current.objectUrl);
+      }
+    };
+  }, []);
+
+  /**
+   * Select a file with generation counter protection against async race conditions.
+   */
   const selectFile = useCallback(async (newFile: File) => {
+    const generation = ++selectionGenerationRef.current;
+
     // Clean up previous state
     cleanup();
     setFile(newFile);
@@ -133,35 +155,47 @@ export function useImageConverter(
     setResizeWidth(undefined);
     setResizeHeight(undefined);
 
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(newFile);
+    // Create tracked preview URL
+    const previewUrl = createTrackedUrl(newFile);
+    if (generation !== selectionGenerationRef.current) {
+      revokeTrackedUrl(previewUrl);
+      return;
+    }
     setOriginalPreviewUrl(previewUrl);
 
-    // Validate
+    // Shared validation pipeline
     const result = await validateFile(newFile);
-    setValidation(result);
-
-    if (!result.valid) {
-      setState({ status: 'error', error: result.error! });
+    if (generation !== selectionGenerationRef.current) {
       return;
     }
 
-    // Set detected format
+    setValidation(result);
+
+    if (!result.valid) {
+      setState({
+        status: 'error',
+        error: result.error || createConversionError('INVALID_FILE'),
+      });
+      return;
+    }
+
+    // Format detection
     const detected = result.format ?? await detectFormat(newFile);
+    if (generation !== selectionGenerationRef.current) {
+      return;
+    }
+
     setInputFormat(detected);
 
-    // Store dimensions
     if (result.width) setOriginalWidth(result.width);
     if (result.height) setOriginalHeight(result.height);
 
-    // If HEIC detected, try to get dimensions from the decoded image
     if ((detected === 'heic' || detected === 'heif') && !result.width) {
-      // Dimensions will be available after conversion; set defaults
       setOriginalWidth(null);
       setOriginalHeight(null);
     }
 
-    // Auto-select appropriate output format
+    // Auto-select appropriate output format for HEIC if not explicitly set by route
     if (detected === 'heic' || detected === 'heif') {
       if (!initialOutputFormat) {
         setOutputFormat('jpg');
@@ -172,21 +206,25 @@ export function useImageConverter(
     setState({ status: 'idle' });
   }, [cleanup, initialOutputFormat]);
 
+  /**
+   * Convert file using canonical worker-backed pipeline.
+   */
   const convert = useCallback(async () => {
     if (!file || !inputFormat) return;
 
-    // Cancel any previous conversion
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    // Clean up previous result
-    if (previousResultRef.current) {
-      cleanupResult(previousResultRef.current);
+    if (previousResultRef.current?.objectUrl) {
+      revokeTrackedUrl(previousResultRef.current.objectUrl);
       previousResultRef.current = null;
     }
 
     setState({ status: 'processing', progress: 0 });
+
+    const jobId = `single-${Date.now()}`;
+    currentJobIdRef.current = jobId;
 
     const options: ConversionOptions = {
       inputFormat,
@@ -195,10 +233,13 @@ export function useImageConverter(
       width: resizeWidth,
       height: resizeHeight,
       maintainAspectRatio,
+      preserveExif,
+      stripGps,
     };
 
     try {
-      const result = await convertImage(
+      const result = await executeConversionJob(
+        jobId,
         file,
         options,
         (progress) => {
@@ -209,20 +250,9 @@ export function useImageConverter(
         abortController.signal,
       );
 
-      // Apply EXIF if requested
-      if (preserveExif && (outputFormat === 'jpg')) {
-        const sourceBuffer = await file.arrayBuffer();
-        result.blob = await applyExifPolicy(result.blob, sourceBuffer, outputFormat, {
-          preserveExif: true,
-          stripGps,
-        });
-        result.outputSize = result.blob.size;
-      }
-
       previousResultRef.current = result;
       setState({ status: 'success', result });
 
-      // Update original dimensions if we didn't have them (HEIC case)
       if (!originalWidth && result.originalWidth) {
         setOriginalWidth(result.originalWidth);
       }
@@ -233,23 +263,41 @@ export function useImageConverter(
       if (abortController.signal.aborted) {
         setState({ status: 'cancelled' });
       } else {
-        const error = isConversionError(err) ? err : {
-          type: 'unknown' as const,
-          message: err instanceof Error ? err.message : 'Unknown error',
-          userMessage: "We couldn't convert this image.",
-          recoveryAction: 'Try another file.',
-        };
+        const error = isConversionError(err)
+          ? err
+          : createConversionError('UNKNOWN', {
+              message: err instanceof Error ? err.message : 'Unknown error',
+            });
         setState({ status: 'error', error });
       }
     }
-  }, [file, inputFormat, outputFormat, quality, resizeWidth, resizeHeight, maintainAspectRatio, originalWidth, originalHeight]);
+  }, [
+    file,
+    inputFormat,
+    outputFormat,
+    quality,
+    resizeWidth,
+    resizeHeight,
+    maintainAspectRatio,
+    preserveExif,
+    stripGps,
+    originalWidth,
+    originalHeight,
+  ]);
 
   const cancel = useCallback(() => {
+    if (currentJobIdRef.current) {
+      globalWorkerPool.cancel(currentJobIdRef.current);
+    }
     abortControllerRef.current?.abort();
     setState({ status: 'cancelled' });
   }, []);
 
   const reset = useCallback(() => {
+    selectionGenerationRef.current++;
+    if (currentJobIdRef.current) {
+      globalWorkerPool.cancel(currentJobIdRef.current);
+    }
     abortControllerRef.current?.abort();
     cleanup();
     setFile(null);
@@ -264,7 +312,7 @@ export function useImageConverter(
   }, [cleanup]);
 
   const download = useCallback(() => {
-    if (state.status !== 'success') return;
+    if (state.status !== 'success' || !state.result.objectUrl) return;
 
     const a = document.createElement('a');
     a.href = state.result.objectUrl;
@@ -308,14 +356,4 @@ export function useImageConverter(
     reset,
     download,
   };
-}
-
-function isConversionError(err: unknown): err is ConversionError {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'type' in err &&
-    'message' in err &&
-    'userMessage' in err
-  );
 }

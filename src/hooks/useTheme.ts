@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useSyncExternalStore, useCallback, useEffect } from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -9,44 +9,73 @@ function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function getResolvedTheme(theme: Theme): 'light' | 'dark' {
-  if (theme === 'system') return getSystemTheme();
-  return theme;
+function getStoredTheme(): Theme {
+  if (typeof window === 'undefined') return 'system';
+  try {
+    return (localStorage.getItem('theme') as Theme) || 'system';
+  } catch {
+    return 'system';
+  }
 }
 
+const themeListeners = new Set<() => void>();
+
+function subscribeTheme(callback: () => void) {
+  themeListeners.add(callback);
+
+  const mql = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const onMediaChange = () => callback();
+  mql?.addEventListener('change', onMediaChange);
+
+  const onStorageChange = (e: StorageEvent) => {
+    if (e.key === 'theme') callback();
+  };
+  window?.addEventListener('storage', onStorageChange);
+
+  return () => {
+    themeListeners.delete(callback);
+    mql?.removeEventListener('change', onMediaChange);
+    window?.removeEventListener('storage', onStorageChange);
+  };
+}
+
+function notifyThemeListeners() {
+  themeListeners.forEach((listener) => listener());
+}
+
+const emptySubscribe = () => () => {};
+
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>('system');
-  const [resolved, setResolved] = useState<'light' | 'dark'>('light');
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
-  // Initialize from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem('theme') as Theme | null;
-    const initial = stored || 'system';
-    setThemeState(initial);
-    setResolved(getResolvedTheme(initial));
-  }, []);
+  const theme = useSyncExternalStore(
+    subscribeTheme,
+    getStoredTheme,
+    () => 'system' as Theme
+  );
 
-  // Listen for system preference changes
-  useEffect(() => {
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (theme === 'system') {
-        setResolved(getSystemTheme());
-      }
-    };
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, [theme]);
+  const resolved: 'light' | 'dark' = theme === 'system' ? getSystemTheme() : theme;
 
-  // Apply to document
+  // Apply data-theme attribute to html root
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', resolved);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', resolved);
+    }
   }, [resolved]);
 
   const setTheme = useCallback((newTheme: Theme) => {
-    setThemeState(newTheme);
-    setResolved(getResolvedTheme(newTheme));
-    localStorage.setItem('theme', newTheme);
+    try {
+      localStorage.setItem('theme', newTheme);
+    } catch {
+      // ignore storage failure in private mode
+    }
+    const nextResolved = newTheme === 'system' ? getSystemTheme() : newTheme;
+    document.documentElement.setAttribute('data-theme', nextResolved);
+    notifyThemeListeners();
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -54,5 +83,5 @@ export function useTheme() {
     setTheme(next);
   }, [resolved, setTheme]);
 
-  return { theme, resolved, setTheme, toggleTheme };
+  return { theme, resolved, mounted, setTheme, toggleTheme };
 }

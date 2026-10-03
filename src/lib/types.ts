@@ -2,6 +2,7 @@
 
 export type InputFormat = 'jpg' | 'jpeg' | 'png' | 'webp' | 'avif' | 'heic' | 'heif';
 export type OutputFormat = 'jpg' | 'png' | 'webp' | 'avif';
+export type ImageFormat = InputFormat | OutputFormat;
 
 export const INPUT_FORMATS: InputFormat[] = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'heic', 'heif'];
 export const OUTPUT_FORMATS: OutputFormat[] = ['jpg', 'png', 'webp', 'avif'];
@@ -32,23 +33,41 @@ export const FORMAT_EXTENSIONS: Record<OutputFormat, string> = {
   avif: '.avif',
 };
 
+/* ─── Resize Types ─── */
+
+export type ResizePreset = 'original' | '75' | '50' | '25' | 'custom';
+
+export interface ResizeOptions {
+  preset?: ResizePreset;
+  width?: number;
+  height?: number;
+  maintainAspectRatio?: boolean;
+}
+
 /* ─── Conversion Options ─── */
 
 export interface ConversionOptions {
   inputFormat: InputFormat;
   outputFormat: OutputFormat;
-  quality: number;         // 0-1
+  quality: number; // 0-1
   width?: number;
   height?: number;
-  maintainAspectRatio: boolean;
+  maintainAspectRatio?: boolean;
+  preserveExif?: boolean;
+  stripGps?: boolean;
+  resizePreset?: ResizePreset;
 }
 
 /* ─── Conversion Result ─── */
 
 export interface ConversionResult {
+  jobId?: string;
   blob: Blob;
+  objectUrl: string;
   filename: string;
   mimeType: string;
+  inputFormat: InputFormat;
+  outputFormat: OutputFormat;
   originalSize: number;
   outputSize: number;
   originalWidth: number;
@@ -56,7 +75,34 @@ export interface ConversionResult {
   outputWidth: number;
   outputHeight: number;
   durationMs: number;
-  objectUrl: string;
+  width?: number;
+  height?: number;
+}
+
+/* ─── Conversion Errors ─── */
+
+export type ConversionErrorCode =
+  | 'INVALID_FILE'
+  | 'UNSUPPORTED_FORMAT'
+  | 'FILE_TOO_LARGE'
+  | 'IMAGE_TOO_LARGE'
+  | 'DECODE_FAILED'
+  | 'ENCODE_FAILED'
+  | 'BROWSER_UNSUPPORTED'
+  | 'MEMORY_LIMIT'
+  | 'CANCELLED'
+  | 'WORKER_ERROR'
+  | 'TIMEOUT'
+  | 'UNKNOWN';
+
+export interface ConversionError {
+  code: ConversionErrorCode;
+  /** Backwards compatibility alias for code lowercase */
+  type: string;
+  message: string;
+  userMessage: string;
+  recoveryAction?: string;
+  technicalDetails?: string;
 }
 
 /* ─── State Machine ─── */
@@ -74,32 +120,10 @@ export type ConversionState =
 export interface ConversionJob {
   id: string;
   file: File;
+  inputFormat: InputFormat;
   options: ConversionOptions;
-  state: ConversionState;
-  createdAt: number;
-}
-
-/* ─── Errors ─── */
-
-export type ConversionErrorType =
-  | 'unsupported_format'
-  | 'corrupted_file'
-  | 'file_too_large'
-  | 'dimensions_too_large'
-  | 'decode_failure'
-  | 'encode_failure'
-  | 'browser_limitation'
-  | 'memory_limitation'
-  | 'worker_failure'
-  | 'cancelled'
-  | 'unknown';
-
-export interface ConversionError {
-  type: ConversionErrorType;
-  message: string;
-  userMessage: string;
-  recoveryAction?: string;
-  technicalDetails?: string;
+  state?: ConversionState;
+  createdAt?: number;
 }
 
 /* ─── File Validation ─── */
@@ -125,7 +149,7 @@ export type WorkerRequest =
       quality: number;
       width?: number;
       height?: number;
-      maintainAspectRatio: boolean;
+      maintainAspectRatio?: boolean;
     }
   | {
       type: 'cancel';
@@ -151,7 +175,7 @@ export type WorkerResponse =
       type: 'error';
       jobId: string;
       error: string;
-      errorType: ConversionErrorType;
+      errorCode: ConversionErrorCode;
     };
 
 /* ─── Format Info (for SEO/education pages) ─── */
@@ -176,15 +200,4 @@ export interface ConversionRoute {
   to: OutputFormat;
   title: string;
   description: string;
-}
-
-/* ─── Resize Preset ─── */
-
-export type ResizePreset = 'original' | '25' | '50' | '75' | 'custom';
-
-export interface ResizeOptions {
-  preset: ResizePreset;
-  width?: number;
-  height?: number;
-  maintainAspectRatio: boolean;
 }

@@ -1,0 +1,37 @@
+# Cloudflare Pages Headers Configuration
+
+# Global Security Headers
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# Next.js Static Fingerprinted Assets (Immutable Long-Term Cache)
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Static Brand & Favicon Assets
+/icon.jpg
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/favicon.ico
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# Web App Manifest & SEO
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=3600
+/sitemap.xml
+  Content-Type: application/xml
+  Cache-Control: public, max-age=3600
+/robots.txt
+  Content-Type: text/plain
+  Cache-Control: public, max-age=3600
+
+# Web Workers & WASM
+*.wasm
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=31536000, immutable

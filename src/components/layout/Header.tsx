@@ -1,20 +1,26 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useTheme } from '@/hooks/useTheme';
 import { BRAND } from '@/lib/constants';
 import styles from './Header.module.css';
 
 export function Header() {
-  const { resolved, toggleTheme } = useTheme();
+  const { resolved, mounted, toggleTheme } = useTheme();
 
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
         <Link href="/" className={styles.brand} aria-label={`${BRAND.name} Home`}>
-          <div className={styles.logoIcon} aria-hidden="true">
-            C
-          </div>
+          <Image
+            src="/icon.jpg"
+            alt={`${BRAND.name} Logo`}
+            width={32}
+            height={32}
+            className={styles.logoImage}
+            priority
+          />
           <span>{BRAND.name}</span>
           <span className={styles.brandBadge}>Free &amp; Private</span>
         </Link>
@@ -37,9 +43,10 @@ export function Header() {
             type="button"
             className={styles.themeToggle}
             onClick={toggleTheme}
-            aria-label={`Switch to ${resolved === 'dark' ? 'light' : 'dark'} mode`}
+            aria-label={mounted ? `Switch to ${resolved === 'dark' ? 'light' : 'dark'} mode` : 'Switch theme'}
+            suppressHydrationWarning
           >
-            {resolved === 'dark' ? (
+            {mounted && resolved === 'dark' ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="5" />
                 <line x1="12" y1="1" x2="12" y2="3" />

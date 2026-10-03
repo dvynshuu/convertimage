@@ -38,7 +38,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
+  border-radius: 6px;
   background: var(--accent-subtle);
   color: var(--accent);
   margin-bottom: 1rem;

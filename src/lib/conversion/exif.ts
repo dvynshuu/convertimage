@@ -1,8 +1,9 @@
 /**
- * EXIF Metadata Extraction and Injection Engine
- * 
- * Provides client-side binary parsing to preserve or sanitize camera & GPS metadata
- * without requiring external native dependencies.
+ * EXIF Metadata Extraction, Normalization, and Injection Engine
+ *
+ * Provides client-side binary parsing to preserve camera metadata
+ * while normalizing orientation (to prevent double-rotation bugs)
+ * and sanitizing GPS metadata when requested.
  */
 
 /**
@@ -104,28 +105,109 @@ export function injectExifIntoJpeg(
 }
 
 /**
- * Strip GPS metadata from an EXIF segment while preserving camera settings & dates.
- * Searches for GPS IFD pointer (Tag 0x8825) in IFD0 and zeros it out.
+ * Read the current orientation tag from an EXIF segment.
+ * Returns orientation number (1-8) or null if tag not present.
  */
-export function sanitizeGpsFromExif(exifSegment: Uint8Array): Uint8Array {
-  // Clone segment so original is not modified
-  const segment = new Uint8Array(exifSegment);
+export function readOrientationFromExif(exifSegment: Uint8Array): number | null {
+  if (exifSegment.length < 18) return null;
 
-  // Segment format: [0xFF, 0xE1, len_hi, len_lo, 'E', 'x', 'i', 'f', 0, 0, TIFF_HEADER...]
+  const tiffStart = 10;
+  const isLittleEndian = exifSegment[tiffStart] === 0x49 && exifSegment[tiffStart + 1] === 0x49;
+  const isBigEndian = exifSegment[tiffStart] === 0x4d && exifSegment[tiffStart + 1] === 0x4d;
+
+  if (!isLittleEndian && !isBigEndian) return null;
+
+  const view = new DataView(exifSegment.buffer, exifSegment.byteOffset, exifSegment.byteLength);
+  const readU16 = (pos: number) => view.getUint16(pos, isLittleEndian);
+  const readU32 = (pos: number) => view.getUint32(pos, isLittleEndian);
+
+  const ifd0Offset = tiffStart + readU32(tiffStart + 4);
+  if (ifd0Offset + 2 > exifSegment.length) return null;
+
+  const numEntries = readU16(ifd0Offset);
+  let entryPos = ifd0Offset + 2;
+
+  for (let i = 0; i < numEntries; i++) {
+    if (entryPos + 12 > exifSegment.length) break;
+
+    const tag = readU16(entryPos);
+    if (tag === 0x0112) {
+      // Orientation tag found (Type 3 = SHORT, count 1, value at entryPos + 8)
+      return readU16(entryPos + 8);
+    }
+
+    entryPos += 12;
+  }
+
+  return null;
+}
+
+/**
+ * Normalize Orientation in EXIF to 1 (Normal / Top-Left).
+ *
+ * Why this is mandatory:
+ * When browsers/workers decode images via createImageBitmap or canvas, the pixel
+ * array is already oriented upright according to the source EXIF. If we inject
+ * the original EXIF segment without resetting the Orientation tag to 1,
+ * image viewers will rotate the upright image a second time (the double-rotation bug).
+ */
+export function normalizeOrientationInExif(exifSegment: Uint8Array): Uint8Array {
+  const segment = new Uint8Array(exifSegment);
   if (segment.length < 18) return segment;
 
-  const tiffStart = 10; // Offset where TIFF header begins
-  const isLittleEndian = segment[tiffStart] === 0x49 && segment[tiffStart + 1] === 0x49; // "II"
-  const isBigEndian = segment[tiffStart] === 0x4d && segment[tiffStart + 1] === 0x4d;    // "MM"
+  const tiffStart = 10;
+  const isLittleEndian = segment[tiffStart] === 0x49 && segment[tiffStart + 1] === 0x49;
+  const isBigEndian = segment[tiffStart] === 0x4d && segment[tiffStart + 1] === 0x4d;
 
   if (!isLittleEndian && !isBigEndian) return segment;
 
   const view = new DataView(segment.buffer, segment.byteOffset, segment.byteLength);
-
   const readU16 = (pos: number) => view.getUint16(pos, isLittleEndian);
   const readU32 = (pos: number) => view.getUint32(pos, isLittleEndian);
 
-  // IFD0 offset relative to TIFF header
+  const ifd0Offset = tiffStart + readU32(tiffStart + 4);
+  if (ifd0Offset + 2 > segment.length) return segment;
+
+  const numEntries = readU16(ifd0Offset);
+  let entryPos = ifd0Offset + 2;
+
+  // Search for Tag 0x0112 (Orientation)
+  for (let i = 0; i < numEntries; i++) {
+    if (entryPos + 12 > segment.length) break;
+
+    const tag = readU16(entryPos);
+    if (tag === 0x0112) {
+      // Set orientation value to 1 (normal)
+      view.setUint16(entryPos + 8, 1, isLittleEndian);
+      // Zero out upper 2 bytes of the 4-byte value field
+      view.setUint16(entryPos + 10, 0, isLittleEndian);
+      break;
+    }
+
+    entryPos += 12;
+  }
+
+  return segment;
+}
+
+/**
+ * Strip GPS metadata from an EXIF segment while preserving camera settings & dates.
+ * Searches for GPS IFD pointer (Tag 0x8825) in IFD0 and zeros it out.
+ */
+export function sanitizeGpsFromExif(exifSegment: Uint8Array): Uint8Array {
+  const segment = new Uint8Array(exifSegment);
+  if (segment.length < 18) return segment;
+
+  const tiffStart = 10;
+  const isLittleEndian = segment[tiffStart] === 0x49 && segment[tiffStart + 1] === 0x49;
+  const isBigEndian = segment[tiffStart] === 0x4d && segment[tiffStart + 1] === 0x4d;
+
+  if (!isLittleEndian && !isBigEndian) return segment;
+
+  const view = new DataView(segment.buffer, segment.byteOffset, segment.byteLength);
+  const readU16 = (pos: number) => view.getUint16(pos, isLittleEndian);
+  const readU32 = (pos: number) => view.getUint32(pos, isLittleEndian);
+
   const ifd0Offset = tiffStart + readU32(tiffStart + 4);
   if (ifd0Offset + 2 > segment.length) return segment;
 
@@ -151,7 +233,9 @@ export function sanitizeGpsFromExif(exifSegment: Uint8Array): Uint8Array {
 }
 
 /**
- * Apply EXIF preservation or stripping policy to an output Blob.
+ * Apply EXIF preservation policy to an output Blob.
+ * Normalizes orientation to 1 to prevent double-rotation.
+ * Sanitizes GPS when requested.
  */
 export async function applyExifPolicy(
   outputBlob: Blob,
@@ -159,7 +243,6 @@ export async function applyExifPolicy(
   outputFormat: string,
   options: { preserveExif: boolean; stripGps?: boolean },
 ): Promise<Blob> {
-  // If user selected to strip metadata or format is not JPEG/WebP, canvas naturally stripped it
   if (!options.preserveExif) {
     return outputBlob;
   }
@@ -174,6 +257,9 @@ export async function applyExifPolicy(
     return outputBlob;
   }
 
+  // Always normalize orientation to 1 so already-rendered pixels aren't rotated again
+  exifSegment = normalizeOrientationInExif(exifSegment);
+
   if (options.stripGps) {
     exifSegment = sanitizeGpsFromExif(exifSegment);
   }
@@ -181,5 +267,5 @@ export async function applyExifPolicy(
   const outputArrayBuffer = await outputBlob.arrayBuffer();
   const withExifBuffer = injectExifIntoJpeg(outputArrayBuffer, exifSegment);
 
-  return new Blob([withExifBuffer], { type: outputBlob.type });
+  return new Blob([withExifBuffer], { type: outputBlob.type || 'image/jpeg' });
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { BRAND, CONVERSION_ROUTES } from '@/lib/constants';
 import styles from './Footer.module.css';
 
@@ -13,7 +14,16 @@ export function Footer() {
       <div className={styles.inner}>
         <div className={styles.top}>
           <div className={styles.brandCol}>
-            <span className={styles.brandName}>{BRAND.name}</span>
+            <div className={styles.brandTitleRow}>
+              <Image
+                src="/icon.jpg"
+                alt={`${BRAND.name} Logo`}
+                width={28}
+                height={28}
+                className={styles.footerLogo}
+              />
+              <span className={styles.brandName}>{BRAND.name}</span>
+            </div>
             <p className={styles.brandDesc}>
               High-performance, private in-browser image conversion. No file uploads, no server processing, no data tracking.
             </p>

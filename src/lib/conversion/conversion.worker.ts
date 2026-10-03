@@ -2,18 +2,14 @@
 
 import type { WorkerRequest, WorkerResponse } from '../types';
 import { FORMAT_MIME_MAP } from '../types';
+import { IMAGE_LIMITS } from '../constants';
 
-/* ─── Web Worker for Off-Thread Image Conversion ─── */
+/* ─── Persistent Reusable Web Worker for Off-Thread Image Conversion ─── */
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const data = event.data;
 
-  if (data.type === 'cancel') {
-    // Handled by worker termination in pool
-    return;
-  }
-
-  if (data.type !== 'convert') {
+  if (!data || data.type !== 'convert') {
     return;
   }
 
@@ -34,13 +30,21 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     self.postMessage({ type: 'progress', jobId, progress: 0.1 } as WorkerResponse);
 
     // 1. Decode using createImageBitmap (hardware-accelerated in worker)
-    const blob = new Blob([buffer], { type: FORMAT_MIME_MAP[inputFormat] || 'image/jpeg' });
-    let bitmap: ImageBitmap;
+    const mime = FORMAT_MIME_MAP[inputFormat] || 'image/jpeg';
+    const blob = new Blob([buffer], { type: mime });
 
+    let bitmap: ImageBitmap;
     try {
       bitmap = await createImageBitmap(blob);
-    } catch {
-      throw new Error(`Failed to decode ${inputFormat.toUpperCase()} image`);
+    } catch (decodeErr) {
+      const msg = decodeErr instanceof Error ? decodeErr.message : 'Decode failed';
+      self.postMessage({
+        type: 'error',
+        jobId,
+        error: `Failed to decode ${inputFormat.toUpperCase()} image: ${msg}`,
+        errorCode: 'DECODE_FAILED',
+      } as WorkerResponse);
+      return;
     }
 
     self.postMessage({ type: 'progress', jobId, progress: 0.4 } as WorkerResponse);
@@ -52,7 +56,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     let finalWidth = targetWidth || origWidth;
     let finalHeight = targetHeight || origHeight;
 
-    if (maintainAspectRatio && origWidth > 0 && origHeight > 0) {
+    const maintainAspect = maintainAspectRatio !== false;
+    if (maintainAspect && origWidth > 0 && origHeight > 0) {
       if (targetWidth && !targetHeight) {
         finalHeight = Math.round((targetWidth / origWidth) * origHeight);
       } else if (targetHeight && !targetWidth) {
@@ -68,22 +73,52 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       }
     }
 
-    finalWidth = Math.max(1, finalWidth);
-    finalHeight = Math.max(1, finalHeight);
+    finalWidth = Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, finalWidth));
+    finalHeight = Math.max(1, Math.min(IMAGE_LIMITS.maxDimension, finalHeight));
+
+    // Check pixel safety limits
+    if (finalWidth * finalHeight > IMAGE_LIMITS.maxPixels) {
+      bitmap.close();
+      self.postMessage({
+        type: 'error',
+        jobId,
+        error: `Target image dimensions (${finalWidth}x${finalHeight}) exceed safe limit.`,
+        errorCode: 'IMAGE_TOO_LARGE',
+      } as WorkerResponse);
+      return;
+    }
 
     // 3. Render into OffscreenCanvas
-    const canvas = new OffscreenCanvas(finalWidth, finalHeight);
-    const ctx = canvas.getContext('2d', { alpha: true });
+    let canvas: OffscreenCanvas;
+    try {
+      canvas = new OffscreenCanvas(finalWidth, finalHeight);
+    } catch {
+      bitmap.close();
+      self.postMessage({
+        type: 'error',
+        jobId,
+        error: 'OffscreenCanvas allocation failed.',
+        errorCode: 'MEMORY_LIMIT',
+      } as WorkerResponse);
+      return;
+    }
 
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
       bitmap.close();
-      throw new Error('Failed to acquire OffscreenCanvas 2D context');
+      self.postMessage({
+        type: 'error',
+        jobId,
+        error: 'Failed to acquire OffscreenCanvas 2D context',
+        errorCode: 'WORKER_ERROR',
+      } as WorkerResponse);
+      return;
     }
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // White background for JPG if transparency could be present
+    // Shared pixel behavior: Fill with pure white for JPG to properly handle transparent sources
     if (outputFormat === 'jpg') {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, finalWidth, finalHeight);
@@ -95,17 +130,24 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     self.postMessage({ type: 'progress', jobId, progress: 0.7 } as WorkerResponse);
 
     // 4. Encode to target format
-    const mimeType = FORMAT_MIME_MAP[outputFormat] || 'image/jpeg';
+    const outMime = FORMAT_MIME_MAP[outputFormat] || 'image/jpeg';
     const encodeQuality = outputFormat === 'png' ? undefined : quality;
 
     let outputBlob: Blob;
     try {
       outputBlob = await canvas.convertToBlob({
-        type: mimeType,
+        type: outMime,
         quality: encodeQuality,
       });
-    } catch {
-      throw new Error(`Browser failed to encode image into ${outputFormat.toUpperCase()}`);
+    } catch (encodeErr) {
+      const msg = encodeErr instanceof Error ? encodeErr.message : 'Encoding failed';
+      self.postMessage({
+        type: 'error',
+        jobId,
+        error: `Browser failed to encode image into ${outputFormat.toUpperCase()}: ${msg}`,
+        errorCode: 'ENCODE_FAILED',
+      } as WorkerResponse);
+      return;
     }
 
     self.postMessage({ type: 'progress', jobId, progress: 0.9 } as WorkerResponse);
@@ -113,12 +155,12 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     const outputBuffer = await outputBlob.arrayBuffer();
     const durationMs = Math.round(performance.now() - startTime);
 
-    // Post success with transferable buffer for zero-copy performance
+    // Transferable buffer for zero-copy postMessage
     const response: WorkerResponse = {
       type: 'success',
       jobId,
       buffer: outputBuffer,
-      mimeType,
+      mimeType: outMime,
       width: finalWidth,
       height: finalHeight,
       durationMs,
@@ -127,12 +169,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     self.postMessage(response, [outputBuffer]);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown worker conversion failure';
-    const response: WorkerResponse = {
+    self.postMessage({
       type: 'error',
       jobId,
       error: errorMsg,
-      errorType: 'worker_failure',
-    };
-    self.postMessage(response);
+      errorCode: 'WORKER_ERROR',
+    } as WorkerResponse);
   }
 };

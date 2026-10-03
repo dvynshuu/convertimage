@@ -33,6 +33,7 @@ export function FAQ({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        suppressHydrationWarning
       />
 
       <div className={styles.headingArea}>

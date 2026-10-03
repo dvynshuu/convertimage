@@ -60,6 +60,12 @@
   margin-left: 0.35rem;
 }
 
+.savingsBadgeWarning {
+  font-weight: 600;
+  color: var(--warning);
+  margin-left: 0.35rem;
+}
+
 .headerActions {
   display: flex;
   align-items: center;

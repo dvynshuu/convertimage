@@ -1,9 +1,8 @@
 /**
- * Conversion Engine — the core conversion pipeline.
- * Runs in the main thread but delegates heavy work to the canvas API.
- * For HEIC, dynamically loads heic2any.
+ * Conversion Engine — Decoder and Rendering Pipeline.
  *
- * This module is framework-agnostic and does not import React.
+ * Implements main-thread decoding, specialized HEIC lazy-loaded pipeline,
+ * and canonical canvas rendering with identical pixel behavior to workers.
  */
 
 import type {
@@ -11,17 +10,164 @@ import type {
   OutputFormat,
   ConversionOptions,
   ConversionResult,
-  ConversionError,
 } from '../types';
 import { FORMAT_MIME_MAP } from '../types';
-import { generateOutputFilename } from '../formats';
+import { generateOutputFilename, calculateResizeDimensions } from '../formats';
 import { IMAGE_LIMITS } from '../constants';
+import { createConversionError } from '../errors';
+import { createTrackedUrl } from '../objectUrls';
 
 /**
- * Convert an image file to the target format.
- * Returns a ConversionResult on success or throws a ConversionError.
+ * Render an ImageBitmap to a canvas with canonical background and smoothing.
+ * Enforces identical pixel behavior for JPG background between single and batch.
  */
-export async function convertImage(
+export function renderToCanvas(
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  outputFormat: OutputFormat,
+): OffscreenCanvas | HTMLCanvasElement {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) throw new Error('Failed to acquire OffscreenCanvas 2D context');
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    if (outputFormat === 'jpg') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    return canvas;
+  }
+
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) throw new Error('Failed to acquire Canvas 2D context');
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    if (outputFormat === 'jpg') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    return canvas;
+  }
+
+  throw new Error('No canvas support available in this environment');
+}
+
+/**
+ * Convert canvas to Blob in target format.
+ */
+export async function canvasToBlob(
+  canvas: OffscreenCanvas | HTMLCanvasElement,
+  format: OutputFormat,
+  quality: number,
+): Promise<Blob> {
+  const mimeType = FORMAT_MIME_MAP[format] || 'image/jpeg';
+  const encodeQuality = format === 'png' ? undefined : quality;
+
+  if (canvas instanceof OffscreenCanvas) {
+    return canvas.convertToBlob({
+      type: mimeType,
+      quality: encodeQuality,
+    });
+  }
+
+  return new Promise<Blob>((resolve, reject) => {
+    (canvas as HTMLCanvasElement).toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Canvas encoding returned null'));
+      },
+      mimeType,
+      encodeQuality,
+    );
+  });
+}
+
+/**
+ * Decode an image file to an ImageBitmap.
+ * Handles HEIC/HEIF via lazy-loaded dynamic import of heic2any.
+ */
+export async function decodeImage(
+  file: File,
+  inputFormat: InputFormat,
+  onProgress?: (progress: number) => void,
+  abortSignal?: AbortSignal,
+): Promise<ImageBitmap> {
+  if (abortSignal?.aborted) {
+    throw createConversionError('CANCELLED');
+  }
+
+  // Specialized HEIC/HEIF pipeline (lazy loads decoder only when requested)
+  if (inputFormat === 'heic' || inputFormat === 'heif') {
+    onProgress?.(0.1);
+
+    let heic2anyModule;
+    try {
+      heic2anyModule = await import('heic2any');
+    } catch {
+      throw createConversionError('BROWSER_UNSUPPORTED', {
+        userMessage: 'HEIC decoding library failed to load.',
+        recoveryAction: 'Check your internet connection or try another format.',
+      });
+    }
+
+    if (abortSignal?.aborted) throw createConversionError('CANCELLED');
+    onProgress?.(0.2);
+
+    const heic2any = heic2anyModule.default || heic2anyModule;
+
+    let convertedBlob: Blob | Blob[];
+    try {
+      convertedBlob = await heic2any({
+        blob: file,
+        toType: 'image/png',
+        quality: 1,
+      });
+    } catch (err) {
+      if (abortSignal?.aborted) throw createConversionError('CANCELLED');
+      throw createConversionError('DECODE_FAILED', {
+        message: err instanceof Error ? err.message : 'heic2any decode failure',
+        userMessage: "Couldn't decode this HEIC file.",
+        recoveryAction: 'The file might be damaged or use an unsupported HEIC subtype.',
+      });
+    }
+
+    if (abortSignal?.aborted) throw createConversionError('CANCELLED');
+    onProgress?.(0.35);
+
+    const resultBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+    return createImageBitmap(resultBlob);
+  }
+
+  // Standard web formats
+  onProgress?.(0.15);
+  try {
+    return await createImageBitmap(file);
+  } catch (err) {
+    if (abortSignal?.aborted) throw createConversionError('CANCELLED');
+    throw createConversionError('DECODE_FAILED', {
+      message: err instanceof Error ? err.message : 'createImageBitmap failed',
+    });
+  }
+}
+
+/**
+ * Main-thread conversion execution (used for HEIC/HEIF and worker fallback).
+ */
+export async function convertImageMainThread(
   file: File,
   options: ConversionOptions,
   onProgress?: (progress: number) => void,
@@ -30,70 +176,56 @@ export async function convertImage(
   const startTime = performance.now();
 
   onProgress?.(0.05);
+  if (abortSignal?.aborted) throw createConversionError('CANCELLED');
 
-  if (abortSignal?.aborted) {
-    throw createError('cancelled');
-  }
-
-  // Step 1: Decode image to ImageBitmap
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await decodeImage(file, options.inputFormat, onProgress, abortSignal);
-  } catch (err) {
-    if (abortSignal?.aborted) throw createError('cancelled');
-    if (isConversionError(err)) throw err;
-    throw createError('decode_failure', err);
-  }
+  // Step 1: Decode
+  const bitmap = await decodeImage(file, options.inputFormat, onProgress, abortSignal);
 
   onProgress?.(0.4);
-
   if (abortSignal?.aborted) {
     bitmap.close();
-    throw createError('cancelled');
+    throw createConversionError('CANCELLED');
   }
 
-  // Step 2: Calculate output dimensions
-  const { width: outputWidth, height: outputHeight } = calculateOutputDimensions(
-    bitmap.width,
-    bitmap.height,
-    options,
-  );
+  // Step 2: Calculate target dimensions
+  const dims = calculateResizeDimensions(bitmap.width, bitmap.height, {
+    width: options.width,
+    height: options.height,
+    preset: options.resizePreset,
+    maintainAspectRatio: options.maintainAspectRatio,
+  });
 
-  // Check output dimensions safety
+  const outputWidth = dims.width;
+  const outputHeight = dims.height;
+
   if (outputWidth * outputHeight > IMAGE_LIMITS.maxPixels) {
     bitmap.close();
-    throw createError('dimensions_too_large');
+    throw createConversionError('IMAGE_TOO_LARGE');
   }
 
-  onProgress?.(0.5);
+  onProgress?.(0.55);
 
-  // Step 3: Draw to OffscreenCanvas and encode
+  // Step 3: Render to canvas and encode
   let outputBlob: Blob;
   try {
-    outputBlob = await encodeImage(
-      bitmap,
-      outputWidth,
-      outputHeight,
-      options.outputFormat,
-      options.quality,
-    );
+    const canvas = renderToCanvas(bitmap, outputWidth, outputHeight, options.outputFormat);
+    outputBlob = await canvasToBlob(canvas, options.outputFormat, options.quality);
   } catch (err) {
     bitmap.close();
-    if (abortSignal?.aborted) throw createError('cancelled');
-    throw createError('encode_failure', err);
+    if (abortSignal?.aborted) throw createConversionError('CANCELLED');
+    throw createConversionError('ENCODE_FAILED', {
+      message: err instanceof Error ? err.message : 'Canvas encoding error',
+    });
   }
 
+  bitmap.close();
   onProgress?.(0.9);
 
-  // Step 4: Clean up bitmap
-  bitmap.close();
-
   if (abortSignal?.aborted) {
-    throw createError('cancelled');
+    throw createConversionError('CANCELLED');
   }
 
-  // Step 5: Build result
-  const objectUrl = URL.createObjectURL(outputBlob);
+  const objectUrl = createTrackedUrl(outputBlob);
   const filename = generateOutputFilename(
     file.name,
     options.outputFormat,
@@ -101,168 +233,30 @@ export async function convertImage(
     options.width || options.height ? outputHeight : undefined,
   );
 
-  onProgress?.(1);
+  onProgress?.(1.0);
 
-  const result: ConversionResult = {
+  return {
     blob: outputBlob,
+    objectUrl,
     filename,
-    mimeType: FORMAT_MIME_MAP[options.outputFormat],
+    mimeType: FORMAT_MIME_MAP[options.outputFormat] || 'image/jpeg',
+    inputFormat: options.inputFormat,
+    outputFormat: options.outputFormat,
     originalSize: file.size,
     outputSize: outputBlob.size,
     originalWidth: bitmap.width || outputWidth,
     originalHeight: bitmap.height || outputHeight,
     outputWidth,
     outputHeight,
+    width: outputWidth,
+    height: outputHeight,
     durationMs: Math.round(performance.now() - startTime),
-    objectUrl,
-  };
-
-  return result;
-}
-
-/**
- * Decode an image file to an ImageBitmap.
- * Handles HEIC/HEIF via dynamic import of heic2any.
- */
-async function decodeImage(
-  file: File,
-  inputFormat: InputFormat,
-  onProgress?: (progress: number) => void,
-  abortSignal?: AbortSignal,
-): Promise<ImageBitmap> {
-  // HEIC/HEIF requires special handling
-  if (inputFormat === 'heic' || inputFormat === 'heif') {
-    onProgress?.(0.1);
-
-    // Dynamically import heic2any only when needed
-    const heic2any = (await import('heic2any')).default;
-
-    if (abortSignal?.aborted) throw createError('cancelled');
-
-    onProgress?.(0.2);
-
-    // Convert HEIC to a standard Blob (PNG)
-    const result = await heic2any({
-      blob: file,
-      toType: 'image/png',
-      quality: 1,
-    });
-
-    if (abortSignal?.aborted) throw createError('cancelled');
-
-    onProgress?.(0.3);
-
-    const blob = Array.isArray(result) ? result[0] : result;
-    return createImageBitmap(blob);
-  }
-
-  // Standard web formats — browser can decode directly
-  onProgress?.(0.15);
-  return createImageBitmap(file);
-}
-
-/**
- * Encode an ImageBitmap to the target format using OffscreenCanvas.
- * Falls back to regular Canvas if OffscreenCanvas is not available.
- */
-async function encodeImage(
-  bitmap: ImageBitmap,
-  width: number,
-  height: number,
-  format: OutputFormat,
-  quality: number,
-): Promise<Blob> {
-  const mimeType = FORMAT_MIME_MAP[format];
-
-  // Try OffscreenCanvas first (works in Web Workers)
-  if (typeof OffscreenCanvas !== 'undefined') {
-    const canvas = new OffscreenCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Failed to get 2D context');
-
-    ctx.drawImage(bitmap, 0, 0, width, height);
-
-    // PNG is lossless — don't pass quality
-    if (format === 'png') {
-      return canvas.convertToBlob({ type: mimeType });
-    }
-
-    return canvas.convertToBlob({ type: mimeType, quality });
-  }
-
-  // Fallback: regular canvas (SSR-safe check)
-  if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Failed to get 2D context');
-
-    ctx.drawImage(bitmap, 0, 0, width, height);
-
-    return new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Canvas encoding failed'));
-        },
-        mimeType,
-        format === 'png' ? undefined : quality,
-      );
-    });
-  }
-
-  throw new Error('No canvas support available');
-}
-
-/**
- * Calculate output dimensions respecting aspect ratio and resize options.
- */
-function calculateOutputDimensions(
-  originalWidth: number,
-  originalHeight: number,
-  options: ConversionOptions,
-): { width: number; height: number } {
-  // No resize requested
-  if (!options.width && !options.height) {
-    return { width: originalWidth, height: originalHeight };
-  }
-
-  const aspectRatio = originalWidth / originalHeight;
-
-  if (options.maintainAspectRatio) {
-    if (options.width && !options.height) {
-      return {
-        width: Math.round(options.width),
-        height: Math.round(options.width / aspectRatio),
-      };
-    }
-    if (options.height && !options.width) {
-      return {
-        width: Math.round(options.height * aspectRatio),
-        height: Math.round(options.height),
-      };
-    }
-    if (options.width && options.height) {
-      // Fit within box
-      const scaleW = options.width / originalWidth;
-      const scaleH = options.height / originalHeight;
-      const scale = Math.min(scaleW, scaleH);
-      return {
-        width: Math.round(originalWidth * scale),
-        height: Math.round(originalHeight * scale),
-      };
-    }
-  }
-
-  return {
-    width: options.width || originalWidth,
-    height: options.height || originalHeight,
   };
 }
 
 /**
- * Check if AVIF encoding is supported by the current browser.
+ * Check if AVIF encoding is actually supported by the current browser.
+ * Uses progressive capability detection at runtime.
  */
 export async function checkAvifSupport(): Promise<boolean> {
   if (typeof OffscreenCanvas !== 'undefined') {
@@ -276,71 +270,16 @@ export async function checkAvifSupport(): Promise<boolean> {
   }
 
   if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    const dataUrl = canvas.toDataURL('image/avif', 0.5);
-    return dataUrl.startsWith('data:image/avif');
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const dataUrl = canvas.toDataURL('image/avif', 0.5);
+      return dataUrl.startsWith('data:image/avif');
+    } catch {
+      return false;
+    }
   }
 
   return false;
-}
-
-/**
- * Clean up a conversion result's resources.
- */
-export function cleanupResult(result: ConversionResult): void {
-  if (result.objectUrl) {
-    URL.revokeObjectURL(result.objectUrl);
-  }
-}
-
-/* ─── Error Helpers ─── */
-
-function createError(type: ConversionError['type'], cause?: unknown): ConversionError {
-  const messages: Record<string, { user: string; recovery?: string }> = {
-    cancelled: { user: 'Conversion was cancelled.' },
-    decode_failure: {
-      user: "We couldn't read this image file.",
-      recovery: 'The file may be corrupted or unsupported. Try another file.',
-    },
-    encode_failure: {
-      user: "We couldn't encode the image in this format.",
-      recovery: 'Try a different output format or reduce the image size.',
-    },
-    browser_limitation: {
-      user: 'Your browser does not support this conversion.',
-      recovery: 'Try using Chrome or Edge for the best compatibility.',
-    },
-    dimensions_too_large: {
-      user: "This image's dimensions exceed the safe processing limit.",
-      recovery: 'Try a smaller image.',
-    },
-    memory_limitation: {
-      user: 'Not enough memory to process this image.',
-      recovery: 'Close other tabs and try again, or use a smaller image.',
-    },
-    worker_failure: {
-      user: 'An internal processing error occurred.',
-      recovery: 'Please try again.',
-    },
-    unknown: {
-      user: "We couldn't convert this image.",
-      recovery: 'Try another file.',
-    },
-  };
-
-  const msg = messages[type] || messages.unknown;
-
-  return {
-    type: type as ConversionError['type'],
-    message: cause instanceof Error ? cause.message : String(cause ?? type),
-    userMessage: msg.user,
-    recoveryAction: msg.recovery,
-    technicalDetails: cause instanceof Error ? cause.stack : undefined,
-  };
-}
-
-function isConversionError(err: unknown): err is ConversionError {
-  return typeof err === 'object' && err !== null && 'type' in err && 'userMessage' in err;
 }

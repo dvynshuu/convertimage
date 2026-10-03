@@ -4,9 +4,8 @@ import { useRef, useState } from 'react';
 import type { OutputFormat } from '@/lib/types';
 import { useImageConverter } from '@/hooks/useImageConverter';
 import { useBatchConverter } from '@/hooks/useBatchConverter';
-import { useLicense } from '@/hooks/useLicense';
 import { formatFileSize } from '@/lib/formats';
-import { ACCEPT_STRING } from '@/lib/constants';
+import { ACCEPT_STRING, IMAGE_LIMITS } from '@/lib/constants';
 import { UploadZone } from './UploadZone';
 import { FormatSelector } from './FormatSelector';
 import { QualitySlider } from './QualitySlider';
@@ -29,7 +28,7 @@ export function ImageConverter({
   acceptedFormatsText,
   className = '',
 }: ImageConverterProps) {
-  const { maxBatchSize } = useLicense();
+  const maxBatchFiles = IMAGE_LIMITS.maxBatchFiles;
   const [mode, setMode] = useState<'single' | 'batch'>('single');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,7 +47,7 @@ export function ImageConverter({
       await single.selectFile(files[0]);
     } else {
       setMode('batch');
-      await batch.addFiles(files, maxBatchSize);
+      await batch.addFiles(files, maxBatchFiles);
     }
   };
 
@@ -60,7 +59,7 @@ export function ImageConverter({
     const files = e.target.files;
     if (files && files.length > 0) {
       const fileList = Array.from(files);
-      await batch.addFiles(fileList, maxBatchSize);
+      await batch.addFiles(fileList, maxBatchFiles);
       e.target.value = '';
     }
   };
@@ -162,7 +161,7 @@ export function ImageConverter({
                   onClick={async () => {
                     // Switch to batch mode with this file
                     setMode('batch');
-                    await batch.addFiles([single.file!], maxBatchSize);
+                    await batch.addFiles([single.file!], maxBatchFiles);
                     single.reset();
                   }}
                 >

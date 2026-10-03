@@ -36,6 +36,7 @@ export default function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppSchema) }}
+        suppressHydrationWarning
       />
 
       <section className={styles.hero}>

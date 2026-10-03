@@ -8,10 +8,13 @@ import type {
   ConversionError,
   ResizePreset,
 } from '@/lib/types';
-import { detectFormat } from '@/lib/formats';
-import { DEFAULT_QUALITY } from '@/lib/constants';
+import { validateFile, calculateSavings } from '@/lib/formats';
+import { DEFAULT_QUALITY, IMAGE_LIMITS } from '@/lib/constants';
 import { globalWorkerPool } from '@/lib/conversion/workerPool';
+import { executeConversionJob } from '@/lib/conversion/pipeline';
 import { downloadZip, type ZipFileItem } from '@/lib/conversion/zip';
+import { createConversionError } from '@/lib/errors';
+import { createTrackedUrl, revokeTrackedUrl } from '@/lib/objectUrls';
 
 export interface BatchItem {
   id: string;
@@ -47,8 +50,11 @@ export interface UseBatchConverterReturn {
   successCount: number;
   errorCount: number;
   totalOriginalSize: number;
-  totalOutputSize: number;
-  totalSavingsPercent: number;
+  completedOriginalSize: number;
+  completedOutputSize: number;
+  savingsPercentage: number;
+  isSmaller: boolean;
+  isIdentical: boolean;
 
   setOutputFormat: (f: OutputFormat) => void;
   setQuality: (q: number) => void;
@@ -59,7 +65,7 @@ export interface UseBatchConverterReturn {
   setCustomHeight: (h: number | undefined) => void;
   setMaintainAspectRatio: (lock: boolean) => void;
 
-  addFiles: (files: File[], maxLimit: number) => Promise<{ added: number; skipped: number; hitLimit: boolean }>;
+  addFiles: (files: File[], maxLimit?: number) => Promise<{ added: number; skipped: number; hitLimit: boolean }>;
   removeItem: (id: string) => void;
   clearAll: () => void;
   convertAll: () => Promise<void>;
@@ -86,13 +92,13 @@ export function useBatchConverter(
   const [isZipGenerating, setIsZipGenerating] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
 
-  const previewUrlsRef = useRef<Set<string>>(new Set());
+  const trackedUrlsRef = useRef<Set<string>>(new Set());
 
   // Clean up Object URLs when unmounting
   useEffect(() => {
-    const urls = previewUrlsRef.current;
+    const urls = trackedUrlsRef.current;
     return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
+      urls.forEach((url) => revokeTrackedUrl(url));
       urls.clear();
       globalWorkerPool.cancelAll();
     };
@@ -103,13 +109,18 @@ export function useBatchConverter(
     setQuality(DEFAULT_QUALITY[format]);
   }, []);
 
+  /**
+   * Add files to batch queue with validation and honest capacity limits.
+   * Unknown formats are rejected immediately (Rule 5: never default to jpg).
+   */
   const addFiles = useCallback(
     async (
       newFiles: File[],
-      maxLimit: number,
+      maxLimit: number = IMAGE_LIMITS.maxBatchFiles,
     ): Promise<{ added: number; skipped: number; hitLimit: boolean }> => {
       const currentCount = items.length;
-      const availableSlots = Math.max(0, maxLimit - currentCount);
+      const effectiveLimit = Math.min(maxLimit, IMAGE_LIMITS.maxBatchFiles);
+      const availableSlots = Math.max(0, effectiveLimit - currentCount);
 
       const filesToProcess = newFiles.slice(0, availableSlots);
       const skipped = newFiles.length - filesToProcess.length;
@@ -118,21 +129,37 @@ export function useBatchConverter(
       const createdItems: BatchItem[] = [];
 
       for (const file of filesToProcess) {
-        const detected = await detectFormat(file);
-        const inputFormat: InputFormat = detected || 'jpg';
-        const previewUrl = URL.createObjectURL(file);
-        previewUrlsRef.current.add(previewUrl);
+        const previewUrl = createTrackedUrl(file);
+        trackedUrlsRef.current.add(previewUrl);
 
-        createdItems.push({
-          id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          file,
-          name: file.name,
-          originalSize: file.size,
-          inputFormat,
-          status: 'pending',
-          progress: 0,
-          previewUrl,
-        });
+        // Canonical validation
+        const validation = await validateFile(file);
+
+        if (!validation.valid || !validation.format) {
+          // Reject unknown or corrupted formats without defaulting to JPG
+          createdItems.push({
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            file,
+            name: file.name,
+            originalSize: file.size,
+            inputFormat: 'jpg',
+            status: 'error',
+            progress: 0,
+            previewUrl,
+            error: validation.error || createConversionError('UNSUPPORTED_FORMAT'),
+          });
+        } else {
+          createdItems.push({
+            id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            file,
+            name: file.name,
+            originalSize: file.size,
+            inputFormat: validation.format,
+            status: 'pending',
+            progress: 0,
+            previewUrl,
+          });
+        }
       }
 
       setItems((prev) => [...prev, ...createdItems]);
@@ -146,9 +173,11 @@ export function useBatchConverter(
     setItems((prev) => {
       const target = prev.find((item) => item.id === id);
       if (target) {
-        URL.revokeObjectURL(target.previewUrl);
+        revokeTrackedUrl(target.previewUrl);
+        trackedUrlsRef.current.delete(target.previewUrl);
         if (target.result?.objectUrl) {
-          URL.revokeObjectURL(target.result.objectUrl);
+          revokeTrackedUrl(target.result.objectUrl);
+          trackedUrlsRef.current.delete(target.result.objectUrl);
         }
       }
       return prev.filter((item) => item.id !== id);
@@ -159,9 +188,11 @@ export function useBatchConverter(
     globalWorkerPool.cancelAll();
     setItems((prev) => {
       prev.forEach((item) => {
-        URL.revokeObjectURL(item.previewUrl);
+        revokeTrackedUrl(item.previewUrl);
+        trackedUrlsRef.current.delete(item.previewUrl);
         if (item.result?.objectUrl) {
-          URL.revokeObjectURL(item.result.objectUrl);
+          revokeTrackedUrl(item.result.objectUrl);
+          trackedUrlsRef.current.delete(item.result.objectUrl);
         }
       });
       return [];
@@ -190,6 +221,9 @@ export function useBatchConverter(
     setIsConverting(false);
   }, []);
 
+  /**
+   * Convert all pending/cancelled items using the canonical pipeline.
+   */
   const convertAll = useCallback(async () => {
     const pendingItems = items.filter(
       (item) => item.status === 'pending' || item.status === 'cancelled' || item.status === 'error',
@@ -199,39 +233,31 @@ export function useBatchConverter(
 
     setIsConverting(true);
 
-    // Update statuses to pending/processing in UI
+    // Update statuses to pending in UI
     setItems((prev) =>
       prev.map((item) =>
         pendingItems.some((p) => p.id === item.id)
-          ? { ...item, status: 'pending', progress: 0 }
+          ? { ...item, status: 'pending', progress: 0, error: undefined }
           : item,
       ),
     );
 
     const conversionPromises = pendingItems.map(async (item) => {
-      // Mark as processing
       setItems((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, status: 'processing' } : i)),
       );
 
-      // Determine resize dimensions
-      let targetWidth = customWidth;
-      let targetHeight = customHeight;
-
-      if (resizePreset === '75') {
-        targetWidth = undefined; // Will be scaled in ratio if needed
-      }
-
       try {
-        const result = await globalWorkerPool.enqueue(
+        const result = await executeConversionJob(
           item.id,
           item.file,
           {
             inputFormat: item.inputFormat,
             outputFormat,
             quality,
-            width: targetWidth,
-            height: targetHeight,
+            width: customWidth,
+            height: customHeight,
+            resizePreset,
             maintainAspectRatio,
             preserveExif,
             stripGps,
@@ -243,6 +269,10 @@ export function useBatchConverter(
           },
         );
 
+        if (result.objectUrl) {
+          trackedUrlsRef.current.add(result.objectUrl);
+        }
+
         setItems((prev) =>
           prev.map((i) =>
             i.id === item.id
@@ -251,11 +281,13 @@ export function useBatchConverter(
           ),
         );
       } catch (err) {
-        const error: ConversionError = {
-          type: 'encode_failure',
-          message: err instanceof Error ? err.message : 'Conversion failed',
-          userMessage: 'Failed to convert file',
-        };
+        const error: ConversionError =
+          typeof err === 'object' && err !== null && 'code' in err
+            ? (err as ConversionError)
+            : createConversionError('ENCODE_FAILED', {
+                message: err instanceof Error ? err.message : 'Batch conversion failed',
+              });
+
         setItems((prev) =>
           prev.map((i) =>
             i.id === item.id ? { ...i, status: 'error', progress: 0, error } : i,
@@ -324,20 +356,16 @@ export function useBatchConverter(
   const errorCount = items.filter((i) => i.status === 'error').length;
 
   const totalOriginalSize = items.reduce((acc, i) => acc + i.originalSize, 0);
-  const totalOutputSize = items.reduce(
-    (acc, i) => acc + (i.result ? i.result.outputSize : i.originalSize),
+
+  // Accurate savings calculation only on completed files (Rule 30)
+  const completedItems = items.filter((i) => i.status === 'success' && i.result);
+  const completedOriginalSize = completedItems.reduce((acc, i) => acc + i.originalSize, 0);
+  const completedOutputSize = completedItems.reduce(
+    (acc, i) => acc + (i.result ? i.result.outputSize : 0),
     0,
   );
 
-  const totalSavingsPercent =
-    totalOriginalSize > 0 && successCount > 0
-      ? Math.max(
-          0,
-          Math.round(
-            ((totalOriginalSize - totalOutputSize) / totalOriginalSize) * 100,
-          ),
-        )
-      : 0;
+  const savings = calculateSavings(completedOriginalSize, completedOutputSize);
 
   return {
     items,
@@ -358,8 +386,11 @@ export function useBatchConverter(
     successCount,
     errorCount,
     totalOriginalSize,
-    totalOutputSize,
-    totalSavingsPercent,
+    completedOriginalSize,
+    completedOutputSize,
+    savingsPercentage: savings.percentage,
+    isSmaller: savings.isSmaller,
+    isIdentical: savings.isIdentical,
     setOutputFormat,
     setQuality,
     setPreserveExif,

@@ -1,32 +1,30 @@
 /**
- * ConvertImage — All-Access Configuration
- * All features (500+ batch conversions, 6-worker concurrency, EXIF control)
- * are unlocked and available to all users for free.
+ * ConvertImage — Capabilities & Limits Configuration
+ * All core V1 capabilities are available client-side without artificial paywalls.
  */
 
+import { IMAGE_LIMITS } from './constants';
+
 export const BATCH_LIMITS = {
-  maxBatchSize: 500,
-  maxConcurrency: 6,
-  // Backwards compatibility aliases
-  freeBatchSize: 500,
-  proBatchSize: 500,
-  freeConcurrency: 6,
-  proConcurrency: 6,
+  maxBatchSize: IMAGE_LIMITS.maxBatchFiles,
+  maxConcurrency: IMAGE_LIMITS.maxConcurrentWorkers,
 } as const;
 
-export interface LicenseValidationResult {
-  valid: boolean;
-  tier: 'pro';
-  licenseKey: string | null;
+export interface FeatureAccess {
+  batchConversion: boolean;
+  exifPreservation: boolean;
+  maxBatchFiles: number;
+  maxFileSizeMB: number;
 }
 
 /**
- * All users have full pro access by default
+ * Returns available V1 client-side features and safety limits.
  */
-export function getStoredLicense(): LicenseValidationResult {
-  return { valid: true, tier: 'pro', licenseKey: 'CONVERTIMAGE-UNLOCKED' };
-}
-
-export function validateLicenseKey(): boolean {
-  return true;
+export function getFeatureAccess(): FeatureAccess {
+  return {
+    batchConversion: true,
+    exifPreservation: true,
+    maxBatchFiles: IMAGE_LIMITS.maxBatchFiles,
+    maxFileSizeMB: IMAGE_LIMITS.maxFileSizeMB,
+  };
 }

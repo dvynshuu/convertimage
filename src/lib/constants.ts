@@ -7,7 +7,19 @@ export const IMAGE_LIMITS = {
   maxFileSizeBytes: 25 * 1024 * 1024,
   maxPixels: 100_000_000,          // 100 megapixels
   maxDimension: 16384,             // single side max
+  maxBatchFiles: 50,               // safe in-browser batch queue limit
+  maxConcurrentWorkers: 4,         // safe worker concurrency cap
 } as const;
+
+/* ─── Site URL Configuration ─── */
+
+export function getSiteUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl && envUrl.trim().length > 0) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return 'https://convertimage.dev';
+}
 
 /* ─── Default Quality Values ─── */
 
@@ -220,11 +232,11 @@ export const FAQ_DATA: FAQItem[] = [
   },
   {
     question: 'Is the converter free?',
-    answer: 'Yes. The converter is completely free with no hidden costs, sign-ups, or watermarks.',
+    answer: 'Yes. The converter is completely free with no hidden costs, subscriptions, watermarks, or sign-ups.',
   },
   {
     question: 'Can I convert HEIC photos from my iPhone?',
-    answer: 'Yes. You can convert HEIC and HEIF photos from iPhones and iPads to JPG, PNG, WebP, or AVIF format.',
+    answer: 'Yes. You can convert HEIC and HEIF photos from iPhones and iPads to JPG, PNG, WebP, or AVIF format directly in your browser.',
   },
   {
     question: 'Does conversion reduce image quality?',
@@ -232,11 +244,11 @@ export const FAQ_DATA: FAQItem[] = [
   },
   {
     question: 'Does the converter work on mobile?',
-    answer: 'Yes. The converter is fully responsive and works on all modern mobile browsers including Chrome and Safari on both iOS and Android.',
+    answer: 'Yes. The converter is fully responsive and works on modern mobile browsers including Chrome and Safari on both iOS and Android with device memory safeguards.',
   },
   {
     question: 'What happens to my files after conversion?',
-    answer: 'Your files exist only in your browser\'s memory during conversion. Once you close the tab or start a new conversion, the data is released. Nothing is stored permanently.',
+    answer: 'Your files exist only in your browser\'s temporary memory during conversion. Once you close the tab or start a new conversion, that memory is released. Nothing is stored permanently.',
   },
   {
     question: 'Why is my converted file larger than the original?',
@@ -244,11 +256,11 @@ export const FAQ_DATA: FAQItem[] = [
   },
   {
     question: 'What is the maximum file size?',
-    answer: `You can convert images up to 25 MB. This limit exists to ensure smooth performance in your browser.`,
+    answer: `You can convert images up to ${IMAGE_LIMITS.maxFileSizeMB} MB and up to ${IMAGE_LIMITS.maxBatchFiles} files per batch. These practical limits ensure your browser stays fast and stable without running out of memory.`,
   },
   {
     question: 'Does AVIF conversion work in all browsers?',
-    answer: 'AVIF encoding is supported in Chrome, Edge, and Firefox. Safari has limited AVIF support. If your browser cannot encode AVIF, you will see a clear message suggesting an alternative format.',
+    answer: 'AVIF encoding is supported in Chrome, Edge, and Firefox. Safari has limited AVIF support. If your browser cannot encode AVIF, the converter will automatically detect this and disable the option with an explanation.',
   },
 ];
 
@@ -257,8 +269,10 @@ export const FAQ_DATA: FAQItem[] = [
 export const BRAND = {
   name: 'ConvertImage',
   tagline: 'Fast. Private. Simple.',
-  description: 'Free image conversion directly in your browser.',
-  url: 'https://convertimage.dev',
+  description: 'Free, private image conversion directly in your browser.',
+  get url() {
+    return getSiteUrl();
+  },
   email: 'hello@convertimage.dev',
 } as const;
 
@@ -281,15 +295,15 @@ export const COPY = {
   errors: {
     generic: "We couldn't convert this image.",
     corrupted: 'The file appears to be corrupted or damaged.',
-    tooLarge: 'This image is too large to process safely in your browser.',
-    tooLargeAction: 'Please choose an image under 25 MB.',
-    unsupported: 'This file format is not supported.',
+    tooLarge: `This image is too large to process safely in your browser (max ${IMAGE_LIMITS.maxFileSizeMB} MB).`,
+    tooLargeAction: `Please choose an image under ${IMAGE_LIMITS.maxFileSizeMB} MB.`,
+    unsupported: "This file doesn't appear to be a supported image format.",
     unsupportedAction: 'Try JPG, PNG, WebP, AVIF, or HEIC.',
-    dimensionsTooLarge: 'This image\'s dimensions exceed the safe processing limit.',
+    dimensionsTooLarge: "This image's dimensions exceed safe browser processing limits.",
     browserLimitation: 'Your browser does not support this conversion.',
-    browserLimitationAction: 'Try using Chrome or Edge for the best compatibility.',
-    decodeFailed: 'We couldn\'t read this image file.',
-    encodeFailed: 'We couldn\'t encode the image in this format.',
+    browserLimitationAction: 'Try using Chrome, Edge, or Firefox for full compatibility.',
+    decodeFailed: "We couldn't read this image file.",
+    encodeFailed: "We couldn't encode the image in this format.",
     tryAnother: 'Try another file.',
     retry: 'Try again',
   },

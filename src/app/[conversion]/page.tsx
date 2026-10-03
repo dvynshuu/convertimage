@@ -109,7 +109,7 @@ export default async function ConversionPage({ params }: Props) {
     },
     {
       question: `Is this ${fromUpper} to ${toUpper} converter free to use?`,
-      answer: `Yes, it is 100% free with no file limits, no account requirements, and no watermarks.`,
+      answer: `Yes, it is 100% free with no subscriptions, accounts, or watermarks. For smooth in-browser performance, files are supported up to 25 MB with safe device memory limits.`,
     },
   ];
 
@@ -118,6 +118,7 @@ export default async function ConversionPage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+        suppressHydrationWarning
       />
 
       <div className={styles.container}>

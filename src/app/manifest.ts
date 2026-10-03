@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { BRAND } from '@/lib/constants';
 
+export const dynamic = 'force-static';
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: `${BRAND.name} — Private Image Converter`,
@@ -12,14 +14,15 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#2563eb',
     icons: [
       {
-        src: '/icon.svg',
-        sizes: 'any',
-        type: 'image/svg+xml',
-      },
-      {
         src: '/icon.jpg',
         sizes: '512x512',
         type: 'image/jpeg',
+        purpose: 'any',
+      },
+      {
+        src: '/apple-touch-icon.png',
+        sizes: '180x180',
+        type: 'image/png',
       },
     ],
   };

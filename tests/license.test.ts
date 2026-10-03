@@ -2,23 +2,21 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BATCH_LIMITS,
-  getStoredLicense,
-  validateLicenseKey,
+  getFeatureAccess,
 } from '../src/lib/license';
+import { IMAGE_LIMITS } from '../src/lib/constants';
 
-describe('All-Access Configuration', () => {
-  it('provides unlocked batch limits for all users', () => {
-    assert.equal(BATCH_LIMITS.maxBatchSize, 500);
-    assert.equal(BATCH_LIMITS.maxConcurrency, 6);
+describe('V1 Capabilities Configuration', () => {
+  it('provides honest safe batch limits', () => {
+    assert.equal(BATCH_LIMITS.maxBatchSize, IMAGE_LIMITS.maxBatchFiles);
+    assert.equal(BATCH_LIMITS.maxConcurrency, IMAGE_LIMITS.maxConcurrentWorkers);
   });
 
-  it('reports pro tier access by default without license requirements', () => {
-    const license = getStoredLicense();
-    assert.equal(license.valid, true);
-    assert.equal(license.tier, 'pro');
-  });
-
-  it('validates all keys as true in all-access mode', () => {
-    assert.equal(validateLicenseKey(), true);
+  it('reports all V1 client-side features are enabled', () => {
+    const features = getFeatureAccess();
+    assert.equal(features.batchConversion, true);
+    assert.equal(features.exifPreservation, true);
+    assert.equal(features.maxBatchFiles, 50);
+    assert.equal(features.maxFileSizeMB, 25);
   });
 });

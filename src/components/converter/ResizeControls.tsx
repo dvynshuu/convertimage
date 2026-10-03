@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { ResizePreset } from '@/lib/types';
 import styles from './ResizeControls.module.css';
 
 interface ResizeControlsProps {
@@ -9,12 +10,12 @@ interface ResizeControlsProps {
   width: number | undefined;
   height: number | undefined;
   maintainAspectRatio: boolean;
+  preset?: ResizePreset;
+  onPresetChange?: (preset: ResizePreset) => void;
   onWidthChange: (w: number | undefined) => void;
   onHeightChange: (h: number | undefined) => void;
   onAspectRatioChange: (locked: boolean) => void;
 }
-
-type Preset = 'original' | '75' | '50' | '25';
 
 export function ResizeControls({
   originalWidth,
@@ -22,61 +23,87 @@ export function ResizeControls({
   width,
   height,
   maintainAspectRatio,
+  preset: externalPreset,
+  onPresetChange,
   onWidthChange,
   onHeightChange,
   onAspectRatioChange,
 }: ResizeControlsProps) {
-  const [preset, setPreset] = useState<Preset>('original');
+  const [internalPreset, setInternalPreset] = useState<ResizePreset>('original');
+  const activePreset = externalPreset !== undefined ? externalPreset : internalPreset;
 
-  const aspectRatio = originalWidth && originalHeight
-    ? originalWidth / originalHeight
-    : 1;
+  const aspectRatio =
+    originalWidth && originalHeight && originalHeight > 0
+      ? originalWidth / originalHeight
+      : 1;
 
-  const handlePreset = useCallback((p: Preset) => {
-    setPreset(p);
-    if (!originalWidth || !originalHeight) return;
+  const handlePreset = useCallback(
+    (p: ResizePreset) => {
+      setInternalPreset(p);
+      onPresetChange?.(p);
 
-    if (p === 'original') {
-      onWidthChange(undefined);
-      onHeightChange(undefined);
-      return;
-    }
+      if (p === 'original') {
+        onWidthChange(undefined);
+        onHeightChange(undefined);
+        return;
+      }
 
-    const scale = Number(p) / 100;
-    onWidthChange(Math.round(originalWidth * scale));
-    onHeightChange(Math.round(originalHeight * scale));
-  }, [originalWidth, originalHeight, onWidthChange, onHeightChange]);
+      if (originalWidth && originalHeight && p !== 'custom') {
+        const scale = Number(p) / 100;
+        if (!isNaN(scale)) {
+          onWidthChange(Math.round(originalWidth * scale));
+          onHeightChange(Math.round(originalHeight * scale));
+          return;
+        }
+      }
 
-  const handleWidthChange = useCallback((value: string) => {
-    const w = value ? parseInt(value, 10) : undefined;
-    if (w !== undefined && isNaN(w)) return;
+      // If dimensions are unknown (e.g. batch mode across different files)
+      if (p !== 'custom') {
+        onWidthChange(undefined);
+        onHeightChange(undefined);
+      }
+    },
+    [originalWidth, originalHeight, onPresetChange, onWidthChange, onHeightChange],
+  );
 
-    setPreset('original'); // clear preset
-    onWidthChange(w);
+  const handleWidthChange = useCallback(
+    (value: string) => {
+      const w = value ? parseInt(value, 10) : undefined;
+      if (w !== undefined && isNaN(w)) return;
 
-    if (w && maintainAspectRatio) {
-      onHeightChange(Math.round(w / aspectRatio));
-    }
-  }, [maintainAspectRatio, aspectRatio, onWidthChange, onHeightChange]);
+      setInternalPreset('custom');
+      onPresetChange?.('custom');
+      onWidthChange(w);
 
-  const handleHeightChange = useCallback((value: string) => {
-    const h = value ? parseInt(value, 10) : undefined;
-    if (h !== undefined && isNaN(h)) return;
+      if (w && maintainAspectRatio && originalWidth && originalHeight) {
+        onHeightChange(Math.round(w / aspectRatio));
+      }
+    },
+    [maintainAspectRatio, aspectRatio, originalWidth, originalHeight, onPresetChange, onWidthChange, onHeightChange],
+  );
 
-    setPreset('original');
-    onHeightChange(h);
+  const handleHeightChange = useCallback(
+    (value: string) => {
+      const h = value ? parseInt(value, 10) : undefined;
+      if (h !== undefined && isNaN(h)) return;
 
-    if (h && maintainAspectRatio) {
-      onWidthChange(Math.round(h * aspectRatio));
-    }
-  }, [maintainAspectRatio, aspectRatio, onWidthChange, onHeightChange]);
+      setInternalPreset('custom');
+      onPresetChange?.('custom');
+      onHeightChange(h);
 
-  // Sync width when aspect ratio is toggled on
+      if (h && maintainAspectRatio && originalWidth && originalHeight) {
+        onWidthChange(Math.round(h * aspectRatio));
+      }
+    },
+    [maintainAspectRatio, aspectRatio, originalWidth, originalHeight, onPresetChange, onWidthChange, onHeightChange],
+  );
+
+  // Sync aspect ratio when locked
   useEffect(() => {
-    if (maintainAspectRatio && width && !height) {
+    if (maintainAspectRatio && width && !height && originalWidth && originalHeight) {
       onHeightChange(Math.round(width / aspectRatio));
     }
-  }, [maintainAspectRatio, width, height, aspectRatio, onHeightChange]);
+  }, [maintainAspectRatio, width, height, aspectRatio, originalWidth, originalHeight, onHeightChange]);
 
   return (
     <div className={styles.wrapper}>
@@ -90,11 +117,11 @@ export function ResizeControls({
       </div>
 
       <div className={styles.presets}>
-        {(['original', '75', '50', '25'] as Preset[]).map((p) => (
+        {(['original', '75', '50', '25'] as ResizePreset[]).map((p) => (
           <button
             key={p}
             type="button"
-            className={`${styles.presetBtn} ${preset === p ? styles.presetActive : ''}`}
+            className={`${styles.presetBtn} ${activePreset === p ? styles.presetActive : ''}`}
             onClick={() => handlePreset(p)}
           >
             {p === 'original' ? 'Original' : `${p}%`}
@@ -104,13 +131,15 @@ export function ResizeControls({
 
       <div className={styles.inputs}>
         <div className={styles.inputGroup}>
-          <label htmlFor="resize-width" className={styles.inputLabel}>W</label>
+          <label htmlFor="resize-width" className={styles.inputLabel}>
+            W
+          </label>
           <input
             id="resize-width"
             type="number"
             min={1}
             max={16384}
-            placeholder={originalWidth?.toString() || ''}
+            placeholder={originalWidth ? originalWidth.toString() : 'Width'}
             value={width ?? ''}
             onChange={(e) => handleWidthChange(e.target.value)}
             className={styles.input}
@@ -125,7 +154,16 @@ export function ResizeControls({
           aria-label={maintainAspectRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
           title={maintainAspectRatio ? 'Aspect ratio locked' : 'Aspect ratio unlocked'}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             {maintainAspectRatio ? (
               <>
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -141,13 +179,15 @@ export function ResizeControls({
         </button>
 
         <div className={styles.inputGroup}>
-          <label htmlFor="resize-height" className={styles.inputLabel}>H</label>
+          <label htmlFor="resize-height" className={styles.inputLabel}>
+            H
+          </label>
           <input
             id="resize-height"
             type="number"
             min={1}
             max={16384}
-            placeholder={originalHeight?.toString() || ''}
+            placeholder={originalHeight ? originalHeight.toString() : 'Height'}
             value={height ?? ''}
             onChange={(e) => handleHeightChange(e.target.value)}
             className={styles.input}
