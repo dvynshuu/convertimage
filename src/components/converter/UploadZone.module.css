@@ -1,0 +1,95 @@
+.zone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 2.5rem 2rem;
+  border: 2px dashed var(--upload-border);
+  border-radius: 10px;
+  background: var(--upload-bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.zone:hover {
+  border-color: var(--upload-hover-border);
+  background: var(--upload-hover-bg);
+}
+
+.zone:active {
+  transform: scale(0.995);
+}
+
+.zone:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.dragging {
+  border-color: var(--accent);
+  background: var(--upload-active-bg);
+  border-style: solid;
+  transform: scale(1.005);
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  text-align: center;
+}
+
+.icon {
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  transition: color 0.15s ease;
+}
+
+.zone:hover .icon,
+.dragging .icon {
+  color: var(--accent);
+}
+
+.primary {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.secondary {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.formats {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 480px) {
+  .zone {
+    min-height: 180px;
+    padding: 2rem 1.5rem;
+  }
+}

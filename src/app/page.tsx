@@ -1,69 +1,84 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from 'next/link';
+import { ImageConverter } from '@/components/converter/ImageConverter';
+import { FormatGuide } from '@/components/seo/FormatGuide';
+import { Features } from '@/components/seo/Features';
+import { FAQ } from '@/components/seo/FAQ';
+import { CONVERSION_ROUTES, BRAND } from '@/lib/constants';
+import styles from './page.module.css';
 
-export default function Home() {
+export default function HomePage() {
+  const popularRoutes = CONVERSION_ROUTES.slice(0, 4);
+
+  const webAppSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: BRAND.name,
+    url: BRAND.url,
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Any',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    description: BRAND.description,
+    featureList: [
+      'Client-side image conversion',
+      'JPG, PNG, WebP, AVIF, HEIC support',
+      'Lossless and lossy compression control',
+      'Aspect ratio resizing',
+      'No file uploads or server storage',
+    ],
+  };
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppSchema) }}
+      />
+
+      <section className={styles.hero}>
+        <div className={styles.badge}>
+          <span className={styles.badgeDot} aria-hidden="true" />
+          <span>100% Client-Side · Private · Instant</span>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <h1 className={styles.title}>Convert images directly in your browser.</h1>
+        <p className={styles.subtitle}>
+          Fast, private image conversion between JPG, PNG, WebP, AVIF, and iPhone HEIC.
+          Your files never touch a server.
+        </p>
+
+        <div className={styles.converterWrapper}>
+          <ImageConverter />
         </div>
-      </main>
-    </div>
+
+        <div className={styles.quickLinks}>
+          <span>Popular:</span>
+          {popularRoutes.map((route) => (
+            <Link key={route.slug} href={`/${route.slug}`} className={styles.quickLinkItem}>
+              {route.from.toUpperCase()} to {route.to.toUpperCase()}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <hr className={styles.sectionDivider} />
+
+      <div className={styles.contentWrapper}>
+        <div className="container">
+          <FormatGuide />
+        </div>
+
+        <div className="container">
+          <Features />
+        </div>
+
+        <div className="container">
+          <FAQ />
+        </div>
+      </div>
+    </>
   );
 }
