@@ -5,6 +5,9 @@ import styles from './privacy.module.css';
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description: `Learn how ${BRAND.name} converts images directly in your browser with 100% privacy and zero data tracking.`,
+  alternates: {
+    canonical: `${BRAND.url}/privacy`,
+  },
 };
 
 export default function PrivacyPage() {

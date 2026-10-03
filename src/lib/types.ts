@@ -188,6 +188,11 @@ export interface FormatInfo {
   lossy: boolean;
   supportsTransparency: boolean;
   description: string;
+  developer?: string;
+  compressionAlgorithm?: string;
+  maxColors?: string;
+  browserSupport?: string;
+  typicalSize?: string;
   goodFor: string[];
   limitations: string[];
 }
@@ -200,4 +205,8 @@ export interface ConversionRoute {
   to: OutputFormat;
   title: string;
   description: string;
+  badge?: string;
+  whyConvert?: string;
+  recommendedQuality?: string;
+  idealFor?: string[];
 }

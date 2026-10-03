@@ -23,34 +23,55 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND.url),
   title: {
-    default: `${BRAND.name} — Free In-Browser Image Converter`,
+    default: `${BRAND.name} — Free In-Browser Image Converter (Private, Instant)`,
     template: `%s | ${BRAND.name}`,
   },
-  description: BRAND.description,
+  description:
+    'Convert JPG, PNG, WebP, AVIF, and Apple HEIC images directly in your browser. 100% private, free, and instant client-side conversion without file uploads or server tracking.',
   keywords: [
     'image converter',
+    'free image converter',
+    'heic to jpg',
     'convert jpg to webp',
-    'convert heic to jpg',
     'convert png to webp',
+    'webp to jpg',
     'avif converter',
     'private image converter',
     'client side image conversion',
-    'free image converter',
+    'batch image converter',
+    'convert iphone photos to jpg',
+    'offline image converter',
+    'no upload image converter',
   ],
   authors: [{ name: BRAND.name }],
   creator: BRAND.name,
+  publisher: BRAND.name,
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: BRAND.url,
     siteName: BRAND.name,
     title: `${BRAND.name} — Free In-Browser Image Converter`,
-    description: 'Convert JPG, PNG, WebP, AVIF, and HEIC images directly in your browser. 100% private, free, and fast.',
+    description:
+      'Convert JPG, PNG, WebP, AVIF, and HEIC images directly in your browser. 100% private, free, and fast client-side image converter.',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: `${BRAND.name} — Free In-Browser Image Converter`,
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${BRAND.name} — Free In-Browser Image Converter`,
-    description: 'Convert JPG, PNG, WebP, AVIF, and HEIC images directly in your browser. 100% private, free, and fast.',
+    description:
+      'Convert JPG, PNG, WebP, AVIF, and HEIC images directly in your browser. 100% private, free, and fast client-side image converter.',
+    images: ['/og-image.jpg'],
   },
   robots: {
     index: true,

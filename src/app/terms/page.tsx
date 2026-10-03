@@ -5,6 +5,9 @@ import styles from './terms.module.css';
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description: `Terms and conditions for using ${BRAND.name} image conversion utility.`,
+  alternates: {
+    canonical: `${BRAND.url}/terms`,
+  },
 };
 
 export default function TermsPage() {
