@@ -11,6 +11,7 @@
 .title {
   font-size: clamp(1.5rem, 3vw, 2rem);
   font-weight: 700;
+  letter-spacing: -0.025em;
   color: var(--text);
   margin-bottom: 0.5rem;
 }
@@ -29,13 +30,15 @@
 .item {
   background: var(--surface);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
   border-radius: 8px;
   overflow: hidden;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .item[open] {
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .summary {
@@ -45,6 +48,7 @@
   padding: 1.125rem 1.25rem;
   font-size: 1rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--text);
   cursor: pointer;
   list-style: none;
@@ -58,7 +62,7 @@
 .icon {
   flex-shrink: 0;
   color: var(--text-muted);
-  transition: transform 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .item[open] .icon {
@@ -71,3 +75,4 @@
   line-height: 1.6;
   color: var(--text-secondary);
 }
+

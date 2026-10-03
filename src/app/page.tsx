@@ -40,14 +40,9 @@ export default function HomePage() {
       />
 
       <section className={styles.hero}>
-        <div className={styles.badge}>
-          <span className={styles.badgeDot} aria-hidden="true" />
-          <span>100% Client-Side · Private · Instant</span>
-        </div>
-
         <h1 className={styles.title}>Convert images directly in your browser.</h1>
         <p className={styles.subtitle}>
-          Fast, private image conversion between JPG, PNG, WebP, AVIF, and iPhone HEIC.
+          High-performance, private in-memory conversion across JPG, PNG, WebP, AVIF, and Apple HEIC.
           Your files never touch a server.
         </p>
 

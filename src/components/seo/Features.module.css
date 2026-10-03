@@ -11,6 +11,7 @@
 .title {
   font-size: clamp(1.5rem, 3vw, 2rem);
   font-weight: 700;
+  letter-spacing: -0.025em;
   color: var(--text);
   margin-bottom: 0.5rem;
 }
@@ -29,18 +30,27 @@
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 1.75rem 1.5rem;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .iconWrap {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: var(--accent-subtle);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-bevel);
   color: var(--accent);
   display: flex;
   align-items: center;
@@ -49,7 +59,8 @@
 
 .cardTitle {
   font-size: 1.125rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   color: var(--text);
 }
 
@@ -58,3 +69,4 @@
   color: var(--text-secondary);
   line-height: 1.55;
 }
+

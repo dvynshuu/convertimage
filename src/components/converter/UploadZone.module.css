@@ -4,22 +4,64 @@
   align-items: center;
   justify-content: center;
   min-height: 220px;
-  padding: 2.5rem 2rem;
-  border: 2px dashed var(--upload-border);
-  border-radius: 10px;
+  padding: 2.75rem 2rem;
+  border: 1px dashed var(--upload-border);
+  border-radius: 12px;
   background: var(--upload-bg);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+  transition: 
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
   user-select: none;
+}
+
+/* Industrial Corner Brackets */
+.zone::before,
+.zone::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  transition: border-color 0.15s ease, width 0.15s ease, height 0.15s ease;
+}
+
+.zone::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--border-hover);
+  border-left: 2px solid var(--border-hover);
+  border-top-left-radius: 12px;
+}
+
+.zone::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--border-hover);
+  border-right: 2px solid var(--border-hover);
+  border-bottom-right-radius: 12px;
 }
 
 .zone:hover {
   border-color: var(--upload-hover-border);
   background: var(--upload-hover-bg);
+  box-shadow: var(--shadow-md);
+}
+
+.zone:hover::before,
+.zone:hover::after,
+.dragging::before,
+.dragging::after {
+  border-color: var(--accent);
+  width: 16px;
+  height: 16px;
 }
 
 .zone:active {
-  transform: scale(0.995);
+  transform: scale(0.996);
 }
 
 .zone:focus-visible {
@@ -32,6 +74,7 @@
   background: var(--upload-active-bg);
   border-style: solid;
   transform: scale(1.005);
+  box-shadow: var(--shadow-lg);
 }
 
 .disabled {
@@ -52,14 +95,35 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.5rem;
   text-align: center;
 }
 
+.iconWrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-recessed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.35rem;
+  transition: all 0.15s ease;
+}
+
 .icon {
-  color: var(--text-muted);
-  margin-bottom: 0.25rem;
+  color: var(--text-secondary);
   transition: color 0.15s ease;
+}
+
+.zone:hover .iconWrapper,
+.dragging .iconWrapper {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
 .zone:hover .icon,
@@ -69,27 +133,31 @@
 
 .primary {
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text);
   line-height: 1.4;
+  letter-spacing: -0.015em;
 }
 
 .secondary {
-  font-size: 0.875rem;
-  color: var(--text-muted);
+  font-size: 0.84375rem;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
 .formats {
-  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6875rem;
+  font-weight: 500;
   color: var(--text-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   margin-top: 0.25rem;
 }
 
 @media (max-width: 480px) {
   .zone {
     min-height: 180px;
-    padding: 2rem 1.5rem;
+    padding: 2rem 1.25rem;
   }
 }

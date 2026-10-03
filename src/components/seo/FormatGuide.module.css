@@ -11,6 +11,7 @@
 .title {
   font-size: clamp(1.5rem, 3vw, 2rem);
   font-weight: 700;
+  letter-spacing: -0.025em;
   color: var(--text);
   margin-bottom: 0.5rem;
 }
@@ -29,16 +30,18 @@
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  transition: transform 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card:hover {
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .cardHeader {
@@ -50,16 +53,20 @@
 .formatName {
   font-size: 1.25rem;
   font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--text);
 }
 
 .badge {
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
   font-weight: 600;
+  letter-spacing: 0.05em;
   padding: 3px 8px;
   border-radius: 4px;
-  background: var(--bg-secondary);
+  background: var(--surface);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-bevel);
   color: var(--text-secondary);
 }
 
@@ -70,10 +77,11 @@
 }
 
 .sectionTitle {
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
   margin-bottom: 0.35rem;
 }
@@ -98,3 +106,4 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
+

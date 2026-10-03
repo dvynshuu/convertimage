@@ -2,8 +2,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background: var(--bg-secondary);
+  background: var(--bg-canvas);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-recessed);
   border-radius: 8px;
   padding: 0.875rem 1rem;
 }
@@ -17,8 +18,8 @@
 }
 
 .checkbox {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   accent-color: var(--accent);
   cursor: pointer;
   margin-top: 2px;
@@ -31,8 +32,9 @@
 }
 
 .label {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--text);
 }
 
@@ -53,7 +55,9 @@
 }
 
 .subLabel {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--text-secondary);
   user-select: none;
 }
+
