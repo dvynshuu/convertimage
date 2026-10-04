@@ -14,7 +14,7 @@ export function Header() {
       <div className={styles.inner}>
         <Link href="/" className={styles.brand} aria-label={`${BRAND.name} Home`}>
           <Image
-            src="/icon.jpg"
+            src="/icon-192.png"
             alt={`${BRAND.name} Logo`}
             width={32}
             height={32}
@@ -26,17 +26,20 @@ export function Header() {
         </Link>
 
         <nav className={styles.nav} aria-label="Main Navigation">
+          <Link href="/batch-image-converter" className={styles.navLink}>
+            Batch
+          </Link>
+          <Link href="/image-compressor" className={styles.navLink}>
+            Compress
+          </Link>
+          <Link href="/image-resizer" className={styles.navLink}>
+            Resize
+          </Link>
           <Link href="/#formats" className={styles.navLink}>
             Formats
           </Link>
-          <Link href="/#features" className={styles.navLink}>
-            Why ConvertImage
-          </Link>
           <Link href="/#faq" className={styles.navLink}>
             FAQ
-          </Link>
-          <Link href="/privacy" className={styles.navLink}>
-            Privacy
           </Link>
 
           <button

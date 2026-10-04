@@ -16,6 +16,7 @@ import { generateOutputFilename, calculateResizeDimensions } from '../formats';
 import { IMAGE_LIMITS } from '../constants';
 import { createConversionError } from '../errors';
 import { createTrackedUrl } from '../objectUrls';
+import { decodeHeicToBitmap } from './heicDecoder';
 
 /**
  * Render an ImageBitmap to a canvas with canonical background and smoothing.
@@ -110,46 +111,9 @@ export async function decodeImage(
     throw createConversionError('CANCELLED');
   }
 
-  // Specialized HEIC/HEIF pipeline (lazy loads decoder only when requested)
+  // Specialized HEIC/HEIF multi-tier resilient pipeline
   if (inputFormat === 'heic' || inputFormat === 'heif') {
-    onProgress?.(0.1);
-
-    let heic2anyModule;
-    try {
-      heic2anyModule = await import('heic2any');
-    } catch {
-      throw createConversionError('BROWSER_UNSUPPORTED', {
-        userMessage: 'HEIC decoding library failed to load.',
-        recoveryAction: 'Check your internet connection or try another format.',
-      });
-    }
-
-    if (abortSignal?.aborted) throw createConversionError('CANCELLED');
-    onProgress?.(0.2);
-
-    const heic2any = heic2anyModule.default || heic2anyModule;
-
-    let convertedBlob: Blob | Blob[];
-    try {
-      convertedBlob = await heic2any({
-        blob: file,
-        toType: 'image/png',
-        quality: 1,
-      });
-    } catch (err) {
-      if (abortSignal?.aborted) throw createConversionError('CANCELLED');
-      throw createConversionError('DECODE_FAILED', {
-        message: err instanceof Error ? err.message : 'heic2any decode failure',
-        userMessage: "Couldn't decode this HEIC file.",
-        recoveryAction: 'The file might be damaged or use an unsupported HEIC subtype.',
-      });
-    }
-
-    if (abortSignal?.aborted) throw createConversionError('CANCELLED');
-    onProgress?.(0.35);
-
-    const resultBlob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-    return createImageBitmap(resultBlob);
+    return await decodeHeicToBitmap(file, { onProgress, abortSignal });
   }
 
   // Standard web formats

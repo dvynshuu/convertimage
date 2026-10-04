@@ -16,7 +16,7 @@ export function Footer() {
           <div className={styles.brandCol}>
             <div className={styles.brandTitleRow}>
               <Image
-                src="/icon.jpg"
+                src="/icon-192.png"
                 alt={`${BRAND.name} Logo`}
                 width={28}
                 height={28}
@@ -36,7 +36,33 @@ export function Footer() {
           </div>
 
           <div className={styles.navCol}>
-            <span className={styles.colTitle}>Popular Tools</span>
+            <span className={styles.colTitle}>Core Utilities</span>
+            <ul className={styles.linkList}>
+              <li>
+                <Link href="/batch-image-converter" className={styles.link}>
+                  Batch Converter
+                </Link>
+              </li>
+              <li>
+                <Link href="/image-compressor" className={styles.link}>
+                  Image Compressor
+                </Link>
+              </li>
+              <li>
+                <Link href="/image-resizer" className={styles.link}>
+                  Image Resizer
+                </Link>
+              </li>
+              <li>
+                <Link href="/convert-iphone-photos" className={styles.link}>
+                  iPhone Photo Converter
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div className={styles.navCol}>
+            <span className={styles.colTitle}>Format Tools</span>
             <ul className={styles.linkList}>
               {popularRoutes.map((route) => (
                 <li key={route.slug}>

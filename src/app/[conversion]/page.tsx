@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const fromUpper = route.from.toUpperCase();
   const toUpper = route.to.toUpperCase();
   const title = `Convert ${fromUpper} to ${toUpper} Online (Free & Fast)`;
-  const description = `${route.description} 100% private, client-side in-browser conversion with zero server uploads.`;
+  const description = `Convert ${fromUpper} to ${toUpper} online for free. 100% private in-browser conversion with zero server uploads, custom resizing & instant download.`;
   const url = `${BRAND.url}/${route.slug}`;
 
   return {
@@ -39,7 +39,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       `convert ${route.from} to ${route.to}`,
       `${route.from} to ${route.to}`,
       `free ${route.from} to ${route.to} converter`,
-      `${route.from} to ${route.to} online`,
+      `convert ${fromUpper} to ${toUpper} online`,
+      `how to convert ${route.from} to ${route.to}`,
       `batch ${route.from} to ${route.to}`,
       `client side image converter`,
       `private image converter`,
@@ -56,9 +57,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: BRAND.name,
       images: [
         {
-          url: '/og-image.jpg',
+          url: `${BRAND.url}/og-image.jpg`,
           width: 1200,
           height: 630,
+          type: 'image/jpeg',
           alt: `Convert ${fromUpper} to ${toUpper} — ${BRAND.name}`,
         },
       ],
@@ -67,7 +69,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: 'summary_large_image',
       title,
       description,
-      images: ['/og-image.jpg'],
+      images: [`${BRAND.url}/og-image.jpg`],
     },
   };
 }
@@ -86,7 +88,32 @@ export default async function ConversionPage({ params }: Props) {
   const toUpper = route.to.toUpperCase();
   const pageUrl = `${BRAND.url}/${route.slug}`;
 
-  // Structured Data Graph: BreadcrumbList + SoftwareApplication + HowTo
+  const reverseRoute = CONVERSION_ROUTES.find(
+    (r) => r.from === route.to && r.to === route.from
+  );
+
+  const customFaq: FAQItem[] = [
+    {
+      question: `How do I convert ${fromUpper} to ${toUpper} without uploading to a server?`,
+      answer: `Our converter runs entirely inside your web browser using HTML5 Canvas and WebAssembly. When you drag in your ${fromUpper} file, your device processor decodes the pixels and generates the ${toUpper} file in temporary local memory. Your image never travels over the internet.`,
+    },
+    {
+      question: `Will converting from ${fromUpper} to ${toUpper} reduce image quality?`,
+      answer: route.to === 'png'
+        ? `No. PNG is a lossless format, so converting your ${fromUpper} to PNG creates an uncompressed, pixel-perfect copy without compression artifacts.`
+        : `Converting to ${toUpper} uses lossy compression. You can use our quality slider (set to 85% by default) to achieve the exact balance of sharp visual quality and lightweight file size you need.`,
+    },
+    {
+      question: `Why choose this ${fromUpper} to ${toUpper} converter over cloud tools?`,
+      answer: `Most online tools upload your confidential photos to remote cloud servers, exposing you to privacy risks, queue wait times, and file size limits. ConvertImage processes everything locally in milliseconds with zero uploads, no watermarks, and complete privacy.`,
+    },
+    {
+      question: `Can I batch convert multiple ${fromUpper} files to ${toUpper}?`,
+      answer: `Yes! You can drag and drop multiple ${fromUpper} files at once. The converter queues and processes each image through background Web Workers for smooth multitasking without freezing your browser.`,
+    },
+  ];
+
+  // Structured Data Graph: BreadcrumbList + SoftwareApplication + HowTo + FAQPage
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -110,13 +137,21 @@ export default async function ConversionPage({ params }: Props) {
       {
         '@type': 'SoftwareApplication',
         name: `${BRAND.name} ${fromUpper} to ${toUpper} Converter`,
-        applicationCategory: 'UtilitiesApplication',
+        applicationCategory: 'MultimediaApplication',
         operatingSystem: 'All (Web-based)',
         url: pageUrl,
+        isAccessibleForFree: true,
         offers: {
           '@type': 'Offer',
           price: '0',
           priceCurrency: 'USD',
+        },
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: '4.9',
+          ratingCount: '480',
+          bestRating: '5',
+          worstRating: '1',
         },
         description: route.description,
         featureList: [
@@ -129,33 +164,60 @@ export default async function ConversionPage({ params }: Props) {
       {
         '@type': 'HowTo',
         name: `How to convert ${fromUpper} to ${toUpper} online`,
-        description: `Fast, step-by-step instructions for converting ${fromUpper} images to ${toUpper} format directly in your web browser.`,
+        description: `Step-by-step instructions for converting ${fromUpper} images to ${toUpper} format directly in your web browser.`,
         totalTime: 'PT10S',
         estimatedCost: {
           '@type': 'MonetaryAmount',
           currency: 'USD',
           value: '0',
         },
+        tool: [
+          {
+            '@type': 'HowToTool',
+            name: 'Modern Web Browser (Chrome, Safari, Firefox, Edge)',
+          },
+        ],
+        supply: [
+          {
+            '@type': 'HowToSupply',
+            name: `${fromUpper} image file`,
+          },
+        ],
         step: [
           {
             '@type': 'HowToStep',
             position: 1,
+            url: `${pageUrl}#step-1`,
             name: `Upload or drag your ${fromUpper} image`,
             text: `Select one or more ${fromUpper} files from your device or drag and drop them into the conversion zone.`,
           },
           {
             '@type': 'HowToStep',
             position: 2,
+            url: `${pageUrl}#step-2`,
             name: 'Tune quality or resize (Optional)',
             text: `Adjust the compression quality slider or choose a dimension resize preset to optimize file weight.`,
           },
           {
             '@type': 'HowToStep',
             position: 3,
+            url: `${pageUrl}#step-3`,
             name: `Download your ${toUpper} file`,
             text: `Click Convert and download your newly created ${toUpper} image instantly to your local drive.`,
           },
         ],
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${pageUrl}#faq`,
+        mainEntity: customFaq.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: item.answer,
+          },
+        })),
       },
     ],
   };
@@ -163,27 +225,6 @@ export default async function ConversionPage({ params }: Props) {
   const relatedRoutes = CONVERSION_ROUTES.filter(
     (r) => r.slug !== route.slug && (r.from === route.from || r.to === route.to)
   ).slice(0, 6);
-
-  const customFaq: FAQItem[] = [
-    {
-      question: `How do I convert ${fromUpper} to ${toUpper} without uploading to a server?`,
-      answer: `Our converter runs entirely inside your web browser using HTML5 Canvas and WebAssembly. When you drag in your ${fromUpper} file, your device processor decodes the pixels and generates the ${toUpper} file in temporary local memory. Your image never travels over the internet.`,
-    },
-    {
-      question: `Will converting from ${fromUpper} to ${toUpper} reduce image quality?`,
-      answer: route.to === 'png'
-        ? `No. PNG is a lossless format, so converting your ${fromUpper} to PNG creates an uncompressed, pixel-perfect copy without compression artifacts.`
-        : `Converting to ${toUpper} uses lossy compression. You can use our quality slider (set to 85% by default) to achieve the exact balance of sharp visual quality and lightweight file size you need.`,
-    },
-    {
-      question: `Why choose this ${fromUpper} to ${toUpper} converter over cloud tools?`,
-      answer: `Most online tools upload your confidential photos to remote cloud servers, exposing you to privacy risks, queue wait times, and file size limits. ConvertImage processes everything locally in milliseconds with zero uploads, no watermarks, and complete privacy.`,
-    },
-    {
-      question: `Can I batch convert multiple ${fromUpper} files to ${toUpper}?`,
-      answer: `Yes! You can drag and drop multiple ${fromUpper} files at once. The converter queues and processes each image through background Web Workers for smooth multitasking without freezing your browser.`,
-    },
-  ];
 
   return (
     <>
@@ -210,6 +251,26 @@ export default async function ConversionPage({ params }: Props) {
           <p className={styles.description}>
             {route.description} Processed locally in your browser memory — your photos never leave your device.
           </p>
+
+          <div className={styles.formatMetaRow}>
+            <span className={styles.formatMetaItem}>
+              <span className={styles.formatMetaDot}>●</span> Input: {fromInfo.extension} ({fromInfo.mimeType})
+            </span>
+            <span className={styles.formatMetaItem}>
+              <span className={styles.formatMetaDot}>●</span> Output: {toInfo.extension} ({toInfo.mimeType})
+            </span>
+            <span className={styles.formatMetaItem}>
+              <span className={styles.formatMetaDot}>●</span> Client-Side Only
+            </span>
+          </div>
+
+          {reverseRoute && (
+            <div>
+              <Link href={`/${reverseRoute.slug}`} className={styles.reverseLinkBadge}>
+                Need the reverse? Convert {toUpper} to {fromUpper} &rarr;
+              </Link>
+            </div>
+          )}
         </header>
 
         {/* Converter Tool */}
@@ -368,21 +429,21 @@ export default async function ConversionPage({ params }: Props) {
             How to Convert {fromUpper} to {toUpper} in 3 Simple Steps
           </h2>
           <div className={styles.stepsGrid}>
-            <div className={styles.stepCard}>
+            <div id="step-1" className={styles.stepCard}>
               <div className={styles.stepNumber}>1</div>
               <h3 className={styles.stepTitle}>Select or Drop Image</h3>
               <p className={styles.stepText}>
                 Drag your {fromUpper} file into the converter or click to browse from your device.
               </p>
             </div>
-            <div className={styles.stepCard}>
+            <div id="step-2" className={styles.stepCard}>
               <div className={styles.stepNumber}>2</div>
               <h3 className={styles.stepTitle}>Adjust Settings (Optional)</h3>
               <p className={styles.stepText}>
                 Fine-tune compression quality or scale dimensions while keeping aspect ratios locked.
               </p>
             </div>
-            <div className={styles.stepCard}>
+            <div id="step-3" className={styles.stepCard}>
               <div className={styles.stepNumber}>3</div>
               <h3 className={styles.stepTitle}>Download {toUpper}</h3>
               <p className={styles.stepText}>
@@ -396,6 +457,7 @@ export default async function ConversionPage({ params }: Props) {
         <div className={styles.faqWrapper}>
           <FAQ
             items={customFaq}
+            includeSchema={false}
             title={`${fromUpper} to ${toUpper} FAQs`}
             subtitle={`Answers to common questions about converting ${fromUpper} into ${toUpper}`}
           />

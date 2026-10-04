@@ -6,6 +6,7 @@ interface FAQProps {
   title?: string;
   subtitle?: string;
   className?: string;
+  includeSchema?: boolean;
 }
 
 export function FAQ({
@@ -13,6 +14,7 @@ export function FAQ({
   title = 'Frequently Asked Questions',
   subtitle = 'Everything you need to know about our browser-based image converter',
   className = '',
+  includeSchema = true,
 }: FAQProps) {
   // Generate JSON-LD Schema for SEO
   const jsonLd = {
@@ -30,11 +32,13 @@ export function FAQ({
 
   return (
     <section id="faq" className={`${styles.container} ${className}`} aria-labelledby="faq-title">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        suppressHydrationWarning
-      />
+      {includeSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          suppressHydrationWarning
+        />
+      )}
 
       <div className={styles.headingArea}>
         <h2 id="faq-title" className={styles.title}>{title}</h2>

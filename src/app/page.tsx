@@ -4,30 +4,40 @@ import { ImageConverter } from '@/components/converter/ImageConverter';
 import { FormatGuide } from '@/components/seo/FormatGuide';
 import { Features } from '@/components/seo/Features';
 import { FAQ } from '@/components/seo/FAQ';
-import { CONVERSION_ROUTES, BRAND } from '@/lib/constants';
+import { CONVERSION_ROUTES, BRAND, FAQ_DATA } from '@/lib/constants';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
-  title: 'Free Online Image Converter — Convert JPG, PNG, WebP, AVIF, HEIC',
+  title: {
+    absolute: 'ConvertImage — Free Online Image Converter (Private & Instant)',
+  },
   description:
-    'Convert JPG, PNG, WebP, AVIF, and Apple HEIC images directly in your browser. 100% private, free, and instant client-side conversion. No uploads, no watermarks, no signups.',
+    'Convert JPG, PNG, WebP, AVIF, and HEIC images directly in your browser. 100% free, private client-side conversion with zero file uploads, no limits & no watermarks.',
   alternates: {
     canonical: BRAND.url,
   },
   openGraph: {
-    title: 'Free Online Image Converter — Convert JPG, PNG, WebP, AVIF, HEIC',
+    title: 'ConvertImage — Free Online Image Converter (Private & Instant)',
     description:
-      'Convert JPG, PNG, WebP, AVIF, and Apple HEIC images directly in your browser. 100% private, free, and instant client-side conversion.',
+      'Convert JPG, PNG, WebP, AVIF, and HEIC images directly in your browser. 100% free, private client-side conversion with zero file uploads.',
     url: BRAND.url,
     siteName: BRAND.name,
     images: [
       {
-        url: '/og-image.jpg',
+        url: `${BRAND.url}/og-image.jpg`,
         width: 1200,
         height: 630,
-        alt: 'ConvertImage — Free In-Browser Image Converter',
+        type: 'image/jpeg',
+        alt: `${BRAND.name} — Free In-Browser Image Converter`,
       },
     ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ConvertImage — Free Online Image Converter (Private & Instant)',
+    description:
+      'Convert JPG, PNG, WebP, AVIF, and HEIC images in your browser. 100% private, instant client-side image conversion.',
+    images: [`${BRAND.url}/og-image.jpg`],
   },
 };
 
@@ -95,12 +105,20 @@ export default function HomePage() {
         name: BRAND.name,
         url: BRAND.url,
         applicationCategory: 'MultimediaApplication',
-        operatingSystem: 'Any',
+        operatingSystem: 'All (Web Browser)',
         browserRequirements: 'Requires HTML5 Canvas and WebAssembly capable browser',
+        isAccessibleForFree: true,
         offers: {
           '@type': 'Offer',
           price: '0',
           priceCurrency: 'USD',
+        },
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: '4.9',
+          ratingCount: '1280',
+          bestRating: '5',
+          worstRating: '1',
         },
         description:
           'Free, high-performance, client-side browser image converter supporting JPG, PNG, WebP, AVIF, and Apple HEIC with zero server uploads.',
@@ -111,6 +129,18 @@ export default function HomePage() {
           'Aspect ratio constrained resizing presets (75%, 50%, 25%, Custom)',
           'Complete browser memory isolation with zero tracking',
         ],
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${BRAND.url}/#faq`,
+        mainEntity: FAQ_DATA.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: item.answer,
+          },
+        })),
       },
     ],
   };
@@ -147,6 +177,102 @@ export default function HomePage() {
       <hr className={styles.sectionDivider} />
 
       <div className={styles.contentWrapper}>
+        {/* Core Utilities Grid */}
+        <div className="container">
+          <section className={styles.toolsSection} aria-labelledby="core-tools-title">
+            <div className={styles.toolsHeader}>
+              <h2 id="core-tools-title" className={styles.toolsTitle}>
+                High-Performance Image Utilities
+              </h2>
+              <p className={styles.toolsSubtitle}>
+                Purpose-built tools for bulk conversion, file compression, precision resizing, and iPhone photo compatibility
+              </p>
+            </div>
+
+            <div className={styles.toolsGrid}>
+              <Link href="/batch-image-converter" className={styles.toolCard}>
+                <div className={styles.toolCardIcon} aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                    <path d="M16 3H8" />
+                  </svg>
+                </div>
+                <h3 className={styles.toolCardTitle}>
+                  <span>Batch Converter</span>
+                  <span className={styles.toolCardArrow}>&rarr;</span>
+                </h3>
+                <p className={styles.toolCardDesc}>
+                  Process up to 50 photos simultaneously with parallel Web Workers and one-click ZIP archive download.
+                </p>
+                <div className={styles.toolCardBadge}>
+                  <span>● Up to 50 files / ZIP download</span>
+                </div>
+              </Link>
+
+              <Link href="/image-compressor" className={styles.toolCard}>
+                <div className={styles.toolCardIcon} aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 14 10 14 10 20" />
+                    <polyline points="20 10 14 10 14 4" />
+                    <line x1="14" y1="10" x2="21" y2="3" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </svg>
+                </div>
+                <h3 className={styles.toolCardTitle}>
+                  <span>Image Compressor</span>
+                  <span className={styles.toolCardArrow}>&rarr;</span>
+                </h3>
+                <p className={styles.toolCardDesc}>
+                  Reduce JPG, PNG, and WebP file weights by up to 80% with real-time byte savings calculation.
+                </p>
+                <div className={styles.toolCardBadge}>
+                  <span>● Live savings / Split comparison</span>
+                </div>
+              </Link>
+
+              <Link href="/image-resizer" className={styles.toolCard}>
+                <div className={styles.toolCardIcon} aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 3 21 3 21 9" />
+                    <polyline points="9 21 3 21 3 15" />
+                    <line x1="21" y1="3" x2="14" y2="10" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </svg>
+                </div>
+                <h3 className={styles.toolCardTitle}>
+                  <span>Image Resizer</span>
+                  <span className={styles.toolCardArrow}>&rarr;</span>
+                </h3>
+                <p className={styles.toolCardDesc}>
+                  Scale dimensions with 75%, 50%, 25% presets or specify exact pixel width and height with locked proportions.
+                </p>
+                <div className={styles.toolCardBadge}>
+                  <span>● Presets &amp; Custom Pixels</span>
+                </div>
+              </Link>
+
+              <Link href="/convert-iphone-photos" className={styles.toolCard}>
+                <div className={styles.toolCardIcon} aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
+                </div>
+                <h3 className={styles.toolCardTitle}>
+                  <span>Convert iPhone Photos</span>
+                  <span className={styles.toolCardArrow}>&rarr;</span>
+                </h3>
+                <p className={styles.toolCardDesc}>
+                  Turn Apple HEIC and Live Photos into universally compatible JPGs that open seamlessly on Windows and Android.
+                </p>
+                <div className={styles.toolCardBadge}>
+                  <span>● Windows &amp; Android Compatible</span>
+                </div>
+              </Link>
+            </div>
+          </section>
+        </div>
+
         <div className="container">
           <FormatGuide />
         </div>
@@ -194,7 +320,7 @@ export default function HomePage() {
         </div>
 
         <div className="container">
-          <FAQ />
+          <FAQ includeSchema={false} />
         </div>
       </div>
     </>

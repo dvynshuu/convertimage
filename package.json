@@ -12,6 +12,7 @@
     "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
+    "heic-to": "^1.6.5",
     "heic2any": "^0.0.4",
     "jszip": "^3.10.2",
     "next": "16.3.8",

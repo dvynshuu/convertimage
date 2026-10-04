@@ -148,6 +148,22 @@ export const FORMAT_INFO: Record<string, FormatInfo> = {
     goodFor: ['iPhone and iPad photography', 'Apple ecosystem workflows', 'Live Photos and image bursts'],
     limitations: ['Widespread incompatibility with Windows, Android, and web upload portals', 'Requires conversion for sharing and cross-platform viewing'],
   },
+  heif: {
+    name: 'HEIF',
+    fullName: 'High Efficiency Image File Format',
+    extension: '.heif',
+    mimeType: 'image/heif',
+    lossy: true,
+    supportsTransparency: false,
+    developer: 'Moving Picture Experts Group (MPEG)',
+    compressionAlgorithm: 'HEVC / H.265 Intra-frame',
+    maxColors: 'Up to 16-bit color depth',
+    browserSupport: 'Safari native; Incompatible with Chrome/Firefox native render',
+    typicalSize: '50% smaller than legacy JPEG',
+    description: 'The open High Efficiency Image File standard used by modern Samsung Galaxy devices, Sony Alpha, and Canon cameras. Delivers twice the compression efficiency of standard JPEG with superior color preservation.',
+    goodFor: ['Samsung Galaxy photography', 'Canon & Sony digital cameras', 'High dynamic range scenes', 'Storage efficiency'],
+    limitations: ['Limited legacy Windows and web browser decode support', 'Requires conversion for cross-platform sharing'],
+  },
 };
 
 /* ─── SEO Conversion Routes ─── */
@@ -162,6 +178,16 @@ export const CONVERSION_ROUTES: ConversionRoute[] = [
     whyConvert: 'Apple iPhones save camera shots in HEIC to save storage, but Windows PCs, Android phones, and web upload forms often reject them. Converting to JPG gives you 100% universal compatibility across all devices and platforms.',
     recommendedQuality: '85% – 90% preserves virtually indistinguishable iPhone photo detail while keeping file sizes lightweight.',
     idealFor: ['iPhone photo sharing', 'Windows PC viewing', 'Government & job portal uploads', 'Email attachments'],
+  },
+  {
+    slug: 'heif-to-jpg',
+    from: 'heif',
+    to: 'jpg',
+    title: 'Convert HEIF to JPG — Free Online Converter',
+    description: 'Convert Samsung, Sony, and Canon HEIF photos to universally compatible JPG. Free, private, client-side in-browser conversion with zero server uploads.',
+    whyConvert: 'Android devices and professional cameras frequently capture in HEIF format for storage savings, but desktop apps and online portals reject them. Converting to JPG makes your photos accessible everywhere.',
+    recommendedQuality: '85% – 90% matches original camera fidelity while producing lightweight, universal JPG files.',
+    idealFor: ['Samsung Galaxy photos', 'Sony Alpha & Canon camera exports', 'Web upload forms', 'Desktop photo editing'],
   },
   {
     slug: 'jpg-to-webp',

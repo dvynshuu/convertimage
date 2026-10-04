@@ -1,0 +1,39 @@
+# ConvertImage
+
+> Free, private in-browser image converter. All image decoding, compression, resizing, and re-encoding runs 100% client-side inside browser memory using HTML5 Canvas and WebAssembly. No files or photos are ever uploaded to a server.
+
+ConvertImage (https://convertimage.pages.dev) is a zero-latency, privacy-first digital image utility. It enables users to convert, compress, and resize across JPG, PNG, WebP, AVIF, and Apple HEIC/HEIF without file size paywalls, watermarks, or user registrations.
+
+## Core Utilities
+
+- [Batch Image Converter](https://convertimage.pages.dev/batch-image-converter): Process up to 50 photos simultaneously using multi-threaded Web Workers with instant 1-click ZIP download.
+- [Image Compressor](https://convertimage.pages.dev/image-compressor): Shrink JPG, PNG, WebP, and AVIF file sizes by up to 80% with real-time byte savings calculations and interactive split-view comparison.
+- [Image Resizer](https://convertimage.pages.dev/image-resizer): Proportional dimension scaling with 75%, 50%, 25% presets or custom pixel width and height inputs with locked aspect ratios.
+- [Convert iPhone Photos](https://convertimage.pages.dev/convert-iphone-photos): Convert Apple HEIC and Live Photos directly into universal JPG format for Windows PCs, Android devices, and web upload forms.
+
+## High-Intent Format Converters
+
+- [HEIC to JPG](https://convertimage.pages.dev/heic-to-jpg): Convert iPhone HEIC camera shots to universally compatible JPG format.
+- [HEIF to JPG](https://convertimage.pages.dev/heif-to-jpg): Convert Samsung Galaxy, Sony Alpha, and Canon camera HEIF files to JPG.
+- [JPG to WebP](https://convertimage.pages.dev/jpg-to-webp): Modernize website photos to Google WebP for 25%–35% bandwidth savings.
+- [PNG to WebP](https://convertimage.pages.dev/png-to-webp): Slash transparent PNG graphic sizes by up to 70% while preserving alpha transparency.
+- [WebP to JPG](https://convertimage.pages.dev/webp-to-jpg): Convert downloaded WebP web graphics to standard JPG for Photoshop and legacy software.
+- [WebP to PNG](https://convertimage.pages.dev/webp-to-png): Extract WebP assets into lossless PNG containers with transparency intact.
+- [JPG to PNG](https://convertimage.pages.dev/jpg-to-png): Prevent generational compression loss when preparing photos for raster editing.
+- [PNG to JPG](https://convertimage.pages.dev/png-to-jpg): Downsize heavy screenshots and graphic exports by up to 80% for email and forms.
+- [HEIC to PNG](https://convertimage.pages.dev/heic-to-png): Lossless pixel extraction from Apple HEIC container for design and print.
+- [HEIC to WebP](https://convertimage.pages.dev/heic-to-webp): Transfer iPhone photos straight to web-optimized WebP in one step.
+- [AVIF to JPG](https://convertimage.pages.dev/avif-to-jpg): Convert next-gen AVIF images to universal JPG format for legacy photo tools.
+- [AVIF to PNG](https://convertimage.pages.dev/avif-to-png): Lossless PNG extraction from AVIF graphics with transparency.
+- [JPG to AVIF](https://convertimage.pages.dev/jpg-to-avif): Ultra-compression cutting file sizes by up to 50% compared to JPG.
+- [PNG to AVIF](https://convertimage.pages.dev/png-to-avif): Next-gen transparent UI graphics with massive byte savings.
+- [WebP to AVIF](https://convertimage.pages.dev/webp-to-avif): Upgrade WebP images to AVIF for an additional 15%–20% file weight reduction.
+- [HEIC to AVIF](https://convertimage.pages.dev/heic-to-avif): Transition Apple camera shots to open-standard next-gen AVIF web assets.
+
+## Architectural Capabilities & Privacy Guarantees
+
+- **100% Client-Side**: All processing is performed locally on the client machine using native Canvas 2D, `createImageBitmap`, `OffscreenCanvas`, and WebAssembly (`heic2any`).
+- **Zero Server Uploads**: Binary data never transmits over network sockets. Memory is freed immediately upon tab close or new conversion.
+- **Multi-Threading**: Batch conversion distributes jobs across a Web Worker pool capped at hardware concurrency limits.
+- **Safety Boundaries**: Maximum file size 25 MB; maximum resolution 100 megapixels; safe batch cap 50 files.
+- **Full Documentation**: See [llms-full.txt](https://convertimage.pages.dev/llms-full.txt) for technical format specifications and architecture.

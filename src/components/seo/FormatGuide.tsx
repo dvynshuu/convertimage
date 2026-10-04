@@ -1,4 +1,5 @@
-import { FORMAT_INFO } from '@/lib/constants';
+import Link from 'next/link';
+import { FORMAT_INFO, CONVERSION_ROUTES } from '@/lib/constants';
 import type { InputFormat } from '@/lib/types';
 import styles from './FormatGuide.module.css';
 
@@ -18,6 +19,10 @@ export function FormatGuide() {
         {DISPLAY_FORMATS.map((key) => {
           const info = FORMAT_INFO[key];
           if (!info) return null;
+
+          const toolRoutes = CONVERSION_ROUTES.filter(
+            (r) => r.from === key || r.to === key
+          ).slice(0, 4);
 
           return (
             <div key={key} className={styles.card}>
@@ -46,6 +51,19 @@ export function FormatGuide() {
                   ))}
                 </ul>
               </div>
+
+              {toolRoutes.length > 0 && (
+                <div className={styles.toolsArea}>
+                  <div className={styles.sectionTitle}>Popular Converters:</div>
+                  <div className={styles.toolPills}>
+                    {toolRoutes.map((r) => (
+                      <Link key={r.slug} href={`/${r.slug}`} className={styles.toolPill}>
+                        {r.from.toUpperCase()} &rarr; {r.to.toUpperCase()}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

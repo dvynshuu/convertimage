@@ -12,6 +12,30 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
+      url: `${BRAND.url}/batch-image-converter`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${BRAND.url}/image-compressor`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${BRAND.url}/image-resizer`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${BRAND.url}/convert-iphone-photos`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
       url: `${BRAND.url}/privacy`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
@@ -25,12 +49,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
+  const topSlugs = new Set(['heic-to-jpg', 'jpg-to-webp', 'png-to-webp', 'webp-to-jpg', 'png-to-jpg', 'heic-to-png']);
+
   for (const route of CONVERSION_ROUTES) {
     routes.push({
       url: `${BRAND.url}/${route.slug}`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
-      priority: 0.8,
+      priority: topSlugs.has(route.slug) ? 0.9 : 0.8,
     });
   }
 
