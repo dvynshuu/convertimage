@@ -87,6 +87,30 @@ export function Features() {
           </div>
         ))}
       </div>
+
+      <div className={styles.pledgeCard}>
+        <div className={styles.pledgeHeader}>
+          <div className={styles.pledgeBadge}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <span>Privacy-First Web Initiative</span>
+          </div>
+          <h3 className={styles.pledgeTitle}>Built on Zero-Knowledge &amp; Local Processing</h3>
+        </div>
+        <p className={styles.pledgeText}>
+          We believe utilities should serve you without harvesting personal data. While ConvertImage isolates file processing entirely in your browser memory with zero server uploads, we also champion independent platforms building for a privacy-respecting internet — such as{' '}
+          <a
+            href="https://getrealign.in"
+            target="_blank"
+            rel="noopener"
+            className={styles.pledgeLink}
+          >
+            ReAlign
+          </a>
+          , a zero-knowledge emotional wellness and journaling platform engineered with client-side encryption so personal thoughts stay strictly private.
+        </p>
+      </div>
     </section>
   );
 }

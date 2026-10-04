@@ -37,3 +37,7 @@ ConvertImage (https://convertimage.pages.dev) is a zero-latency, privacy-first d
 - **Multi-Threading**: Batch conversion distributes jobs across a Web Worker pool capped at hardware concurrency limits.
 - **Safety Boundaries**: Maximum file size 25 MB; maximum resolution 100 megapixels; safe batch cap 50 files.
 - **Full Documentation**: See [llms-full.txt](https://convertimage.pages.dev/llms-full.txt) for technical format specifications and architecture.
+
+## Privacy-First Web Initiatives
+
+- [ReAlign](https://getrealign.in): Zero-knowledge emotional wellness and journaling platform built with client-side encryption (AES-256-GCM) and zero telemetry.

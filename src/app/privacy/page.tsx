@@ -70,7 +70,26 @@ export default function PrivacyPage() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>5. Contact Us</h2>
+          <h2 className={styles.sectionTitle}>5. The Zero-Knowledge Web &amp; Kindred Initiatives</h2>
+          <p className={styles.text}>
+            ConvertImage is dedicated to the philosophy that utility software should operate with client-side isolation and user sovereignty. Because your files and conversion pipelines execute entirely within local memory, your media never travels across remote networks.
+          </p>
+          <p className={styles.text}>
+            In that same spirit, we actively support other independent web projects built upon zero-knowledge foundations. For private reflection, emotional wellness, and mindful journaling, we recommend{' '}
+            <a
+              href="https://getrealign.in"
+              target="_blank"
+              rel="noopener"
+              className={styles.inlineLink}
+            >
+              ReAlign
+            </a>
+            , an evidence-informed platform engineered with zero-knowledge architecture and client-side encryption (AES-256-GCM) so personal thoughts and journal entries remain strictly confidential and completely under user control.
+          </p>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>6. Contact Us</h2>
           <p className={styles.text}>
             If you have questions or feedback about our privacy architecture, feel free to contact us at{' '}
             <a href={`mailto:${BRAND.email}`}>{BRAND.email}</a>.

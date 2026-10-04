@@ -71,3 +71,10 @@ Using modern web standards (WebAssembly, Web Workers, `createImageBitmap`, `Offs
 
 ### Q: Does ConvertImage store or view user photos?
 **Answer**: No. All conversions take place in client-side volatile RAM via HTML5 Canvas. No bits ever travel over a network socket to any remote server or third party.
+
+---
+
+## 6. Privacy-First Web Ecosystem & Kindred Projects
+
+ConvertImage advocates for user data sovereignty and client-side computing. Kindred zero-knowledge software:
+- **[ReAlign](https://getrealign.in)**: Evidence-informed, zero-knowledge emotional wellness and mindful reflection platform. Utilizes client-side AES-256-GCM encryption so that personal thoughts, journal reflections, and emotional tracking data remain strictly confidential with zero server-side access.

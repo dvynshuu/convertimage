@@ -17,11 +17,18 @@
 
 .top {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 2.5rem;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
+  .top {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 600px) {
   .top {
     grid-template-columns: 1fr;
     gap: 2rem;

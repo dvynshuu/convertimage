@@ -75,7 +75,7 @@ export function Footer() {
           </div>
 
           <div className={styles.navCol}>
-            <span className={styles.colTitle}>Legal & Info</span>
+            <span className={styles.colTitle}>Legal &amp; Privacy</span>
             <ul className={styles.linkList}>
               <li>
                 <Link href="/privacy" className={styles.link}>
@@ -86,6 +86,17 @@ export function Footer() {
                 <Link href="/terms" className={styles.link}>
                   Terms of Service
                 </Link>
+              </li>
+              <li>
+                <a
+                  href="https://getrealign.in"
+                  target="_blank"
+                  rel="noopener"
+                  className={styles.link}
+                  title="ReAlign — Zero-Knowledge Mindful Journaling"
+                >
+                  ReAlign (Private Journal)
+                </a>
               </li>
               <li>
                 <Link href="/#faq" className={styles.link}>
