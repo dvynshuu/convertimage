@@ -95,6 +95,9 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   manifest: '/manifest.webmanifest',
+  verification: {
+    google: 'jj3HxkbuWMfROu4NvRxqcniMRcBXcLdkFXBnQgpv3cU',
+  },
 };
 
 // Inline script to prevent theme flash before hydration
